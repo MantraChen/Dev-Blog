@@ -1,0 +1,45 @@
+---
+import BaseLayout from "@/components/layout/BaseLayout.astro"
+import { getSkillList } from "@/db/queries"
+
+const skills = await getSkillList()
+
+// Group skills by category
+const grouped = skills.reduce<Record<string, typeof skills>>((acc, skill) => {
+  if (!acc[skill.category]) acc[skill.category] = []
+  acc[skill.category].push(skill)
+  return acc
+}, {})
+
+const categories = Object.entries(grouped)
+---
+
+<BaseLayout title="Skills | Tech Blog" description="Technical skills and proficiency">
+  <div class="max-w-3xl mx-auto py-10">
+    <h1 class="text-3xl font-bold tracking-tight mb-8">Skills</h1>
+    {categories.length === 0 && (
+      <p class="text-muted-foreground text-center py-12">No skills added yet.</p>
+    )}
+    <div class="space-y-10">
+      {categories.map(([category, items]) => (
+        <section>
+          <h2 class="text-xl font-semibold mb-4 text-foreground/80">{category}</h2>
+          <div class="grid gap-3">
+            {items.map((skill) => (
+              <div class="flex items-center gap-4">
+                <span class="text-sm font-medium w-32 shrink-0">{skill.name}</span>
+                <div class="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                  <div
+                    class="h-full rounded-full bg-primary transition-all"
+                    style={`width: ${(skill.level / 5) * 100}%`}
+                  ></div>
+                </div>
+                <span class="text-xs text-muted-foreground w-8 text-right">{skill.level}/5</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  </div>
+</BaseLayout>

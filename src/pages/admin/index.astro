@@ -1,0 +1,33 @@
+---
+import BaseLayout from "@/components/layout/BaseLayout.astro"
+import { validateSession } from "@/lib/auth"
+import { AdminApp } from "@/components/admin/AdminApp"
+
+const isAuthenticated = await validateSession(Astro.request.headers.get("cookie"))
+
+if (!isAuthenticated) {
+  return Astro.redirect("/admin/login")
+}
+---
+
+<BaseLayout title="Admin Dashboard">
+  <div class="py-6">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+      <button
+        id="logout-btn"
+        class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 border hover:bg-accent transition-colors"
+      >
+        Logout
+      </button>
+    </div>
+    <AdminApp client:load />
+  </div>
+
+  <script is:inline>
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/admin/login';
+    });
+  </script>
+</BaseLayout>

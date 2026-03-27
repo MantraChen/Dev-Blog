@@ -1,0 +1,27 @@
+---
+import BaseLayout from "@/components/layout/BaseLayout.astro"
+import { getCollection } from "astro:content"
+import { TagFilter } from "@/components/blog/TagFilter"
+
+const allPosts = await getCollection("blog", ({ data }) => !data.draft)
+const posts = allPosts.sort(
+  (a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf()
+)
+
+const allTags = [...new Set(posts.flatMap((p) => p.data.tags))]
+
+const serializedPosts = posts.map((post) => ({
+  id: post.id,
+  title: post.data.title,
+  description: post.data.description,
+  tags: post.data.tags,
+  publishedAt: post.data.publishedAt.toISOString(),
+}))
+---
+
+<BaseLayout title="Blog | Tech Blog" description="Technical articles and notes">
+  <div class="max-w-3xl mx-auto py-10">
+    <h1 class="text-3xl font-bold tracking-tight mb-8">Blog</h1>
+    <TagFilter posts={serializedPosts} tags={allTags} client:load />
+  </div>
+</BaseLayout>

@@ -1,12 +1,88 @@
 ---
-import { StatusWidget } from '../components/StatusWidget';
-import PostList from '../components/PostList.astro';
-import { getLatestStatuses, getPostList } from '../db/queries';
+import BaseLayout from "@/components/layout/BaseLayout.astro"
+import { getLatestStatuses, getProjectList, getSkillList } from "@/db/queries"
+import { getCollection } from "astro:content"
+import { StatusWidget } from "@/components/StatusWidget"
 
-// 适配 Claude 提供的查询接口
-const statuses = await getLatestStatuses(1);
-const currentStatus = statuses.length > 0 ? statuses[0] : null;
+const statuses = await getLatestStatuses(1)
+const projects = await getProjectList()
+const skills = await getSkillList()
+const allPosts = await getCollection("blog", ({ data }) => !data.draft)
+const recentPosts = allPosts
+  .sort((a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf())
+  .slice(0, 3)
 
-const allPosts = await getPostList();
-const recentPosts = allPosts.slice(0, 5); 
+const topProjects = projects.slice(0, 3)
+const topSkills = skills.slice(0, 8)
 ---
+
+<BaseLayout title="Home | Tech Blog">
+  <section class="space-y-6 pb-8 pt-6 md:pb-12 md:pt-10 lg:py-32">
+    <div class="flex max-w-[64rem] flex-col items-start gap-4">
+      <h1 class="font-heading text-3xl sm:text-5xl md:text-6xl lg:text-7xl">
+        Software Engineer & Future CS PhD
+      </h1>
+      <p class="max-w-[42rem] leading-normal text-muted-foreground sm:text-xl sm:leading-8">
+        Specializing in Concurrent Data Structures, Spatial Indexing, and high-performance computing.
+      </p>
+      {statuses.length > 0 && (
+        <StatusWidget status={statuses[0]} client:load />
+      )}
+    </div>
+  </section>
+
+  <div class="grid gap-12 md:grid-cols-2">
+    <section>
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-semibold tracking-tight">Recent Writing</h2>
+        <a href="/blog" class="text-sm font-medium hover:underline flex items-center gap-1">
+          View all &rarr;
+        </a>
+      </div>
+      <div class="flex flex-col gap-4">
+        {recentPosts.map((post) => (
+          <a href={`/blog/${post.id}`} class="group flex flex-col gap-2 rounded-lg border p-4 transition-colors hover:bg-muted/50">
+            <h3 class="font-semibold">{post.data.title}</h3>
+            <p class="text-sm text-muted-foreground line-clamp-2">{post.data.description}</p>
+            <time class="text-xs text-muted-foreground">
+              {post.data.publishedAt.toLocaleDateString()}
+            </time>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <div class="space-y-12">
+      <section>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-semibold tracking-tight">Featured Projects</h2>
+          <a href="/projects" class="text-sm font-medium hover:underline flex items-center gap-1">
+            View all &rarr;
+          </a>
+        </div>
+        <div class="grid gap-4">
+          {topProjects.map((project) => (
+            <div class="rounded-lg border bg-card text-card-foreground p-4">
+              <h3 class="text-lg font-semibold">{project.name}</h3>
+              <p class="text-sm text-muted-foreground mt-1">{project.description}</p>
+              <div class="flex gap-2 flex-wrap mt-3">
+                {project.techStack.map((tech) => (
+                  <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">{tech}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-semibold tracking-tight mb-6">Core Skills</h2>
+        <div class="flex flex-wrap gap-2">
+          {topSkills.map((skill) => (
+            <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold">{skill.name}</span>
+          ))}
+        </div>
+      </section>
+    </div>
+  </div>
+</BaseLayout>
