@@ -1,6 +1,6 @@
-import { desc, eq, lt } from "drizzle-orm";
+import { desc, eq, lt, like, or, count } from "drizzle-orm";
 import { db } from ".";
-import { projects, posts, statuses, skills, timeline, adminSessions, auditLogs } from "./schema";
+import { projects, posts, postViews, statuses, skills, timeline, adminSessions, auditLogs } from "./schema";
 import type {
   ProjectItem,
   PostItem,
@@ -171,6 +171,46 @@ export async function getAllPosts(): Promise<PostItem[]> {
     .orderBy(desc(posts.publishedAt));
 }
 
+export async function searchPosts(query: string): Promise<PostItem[]> {
+  const pattern = `%${query}%`;
+  return db
+    .select({
+      id: posts.id,
+      title: posts.title,
+      slug: posts.slug,
+      description: posts.description,
+      content: posts.content,
+      tags: posts.tags,
+      featured: posts.featured,
+      draft: posts.draft,
+      publishedAt: posts.publishedAt,
+      updatedAt: posts.updatedAt,
+    })
+    .from(posts)
+    .where(
+      or(
+        like(posts.title, pattern),
+        like(posts.description, pattern),
+        like(posts.content, pattern),
+      )
+    )
+    .orderBy(desc(posts.publishedAt));
+}
+
+export async function getAdjacentPosts(slug: string): Promise<{ prev: Pick<PostItem, "title" | "slug"> | null; next: Pick<PostItem, "title" | "slug"> | null }> {
+  const published = await db
+    .select({ slug: posts.slug, title: posts.title, publishedAt: posts.publishedAt })
+    .from(posts)
+    .where(eq(posts.draft, false))
+    .orderBy(desc(posts.publishedAt));
+
+  const idx = published.findIndex((p) => p.slug === slug);
+  return {
+    prev: idx > 0 ? { title: published[idx - 1].title, slug: published[idx - 1].slug } : null,
+    next: idx < published.length - 1 ? { title: published[idx + 1].title, slug: published[idx + 1].slug } : null,
+  };
+}
+
 export async function getPostBySlug(slug: string): Promise<PostItem | null> {
   const rows = await db
     .select({
@@ -205,6 +245,20 @@ export async function updatePost(id: number, data: Partial<NewPost>) {
 
 export async function deletePost(id: number) {
   return db.delete(posts).where(eq(posts.id, id));
+}
+
+// ─── Post Views ─────────────────────────────────────────────────────
+
+export async function recordPostView(slug: string) {
+  return db.insert(postViews).values({ slug });
+}
+
+export async function getPostViewCount(slug: string): Promise<number> {
+  const rows = await db
+    .select({ count: count() })
+    .from(postViews)
+    .where(eq(postViews.slug, slug));
+  return rows[0]?.count ?? 0;
 }
 
 // ─── Admin Sessions ──────────────────────────────────────────────────

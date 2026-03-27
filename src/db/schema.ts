@@ -52,6 +52,15 @@ export const timeline = sqliteTable("timeline", {
     .default(sql`(datetime('now'))`),
 });
 
+// ─── Post Views ─────────────────────────────────────────────────────
+export const postViews = sqliteTable("post_views", {
+  id: int().primaryKey({ autoIncrement: true }),
+  slug: text().notNull(),
+  createdAt: text()
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 // ─── Posts ───────────────────────────────────────────────────────────
 export const posts = sqliteTable("posts", {
   id: int().primaryKey({ autoIncrement: true }),
