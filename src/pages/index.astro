@@ -1,13 +1,12 @@
 ---
 import BaseLayout from "@/components/layout/BaseLayout.astro"
-import { getLatestStatuses, getProjectList, getSkillList } from "@/db/queries"
-import { getCollection } from "astro:content"
+import { getLatestStatuses, getProjectList, getSkillList, getPublishedPosts } from "@/db/queries"
 
 const statuses = await getLatestStatuses(1)
 const projects = await getProjectList()
 const skills = await getSkillList()
-const allPosts = await getCollection("blog", ({ data }) => !data.draft)
-const recentPosts = allPosts.sort((a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf()).slice(0, 3)
+const allPosts = await getPublishedPosts()
+const recentPosts = allPosts.slice(0, 3)
 
 const topProjects = projects.slice(0, 3)
 const topSkills = skills.slice(0, 8)
@@ -22,7 +21,7 @@ const topSkills = skills.slice(0, 8)
           Hi, I'm Mantra Chen.
         </h1>
         <p class="max-w-[42rem] leading-normal text-muted-foreground sm:text-xl sm:leading-8">
-          CTO & Systems Developer. I spend most of my time writing C++, Rust, and Go, specializing in concurrent data structures and spatial indexing engines.
+          CTO & Systems Developer. Writing C++, Java, Python, and Rust to build systems that are fast and unbreakable. Specializing in extreme-performance algorithms and kernel-space security.
         </p>
       </div>
 
@@ -70,11 +69,11 @@ const topSkills = skills.slice(0, 8)
       </div>
       <div class="flex flex-col gap-4">
         {recentPosts.map((post) => (
-          <a href={`/blog/${post.id}`} class="group flex flex-col gap-2 rounded-lg border bg-card p-5 transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-sm dark:hover:shadow-zinc-800/50 hover:border-zinc-300 dark:hover:border-zinc-700">
-            <h3 class="font-semibold group-hover:text-primary transition-colors">{post.data.title}</h3>
-            <p class="text-sm text-muted-foreground line-clamp-2">{post.data.description}</p>
+          <a href={`/blog/${post.slug}`} class="group flex flex-col gap-2 rounded-lg border bg-card p-5 transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-sm dark:hover:shadow-zinc-800/50 hover:border-zinc-300 dark:hover:border-zinc-700">
+            <h3 class="font-semibold group-hover:text-primary transition-colors">{post.title}</h3>
+            <p class="text-sm text-muted-foreground line-clamp-2">{post.description}</p>
             <time class="text-xs text-muted-foreground mt-2">
-              {post.data.publishedAt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+              {new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
             </time>
           </a>
         ))}

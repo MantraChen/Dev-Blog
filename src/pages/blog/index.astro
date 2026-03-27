@@ -1,21 +1,18 @@
 ---
 import BaseLayout from "@/components/layout/BaseLayout.astro"
-import { getCollection } from "astro:content"
 import { TagFilter } from "@/components/blog/TagFilter"
+import { getPublishedPosts } from "@/db/queries"
 
-const allPosts = await getCollection("blog", ({ data }) => !data.draft)
-const posts = allPosts.sort(
-  (a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf()
-)
+const posts = await getPublishedPosts()
 
-const allTags = [...new Set(posts.flatMap((p) => p.data.tags))]
+const allTags = [...new Set(posts.flatMap((p) => p.tags))]
 
 const serializedPosts = posts.map((post) => ({
-  id: post.id,
-  title: post.data.title,
-  description: post.data.description || "",
-  tags: post.data.tags,
-  publishedAt: post.data.publishedAt.toISOString(),
+  id: post.slug,
+  title: post.title,
+  description: post.description || "",
+  tags: post.tags,
+  publishedAt: post.publishedAt,
 }))
 ---
 

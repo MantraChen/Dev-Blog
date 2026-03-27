@@ -52,6 +52,25 @@ export const timeline = sqliteTable("timeline", {
     .default(sql`(datetime('now'))`),
 });
 
+// ─── Posts ───────────────────────────────────────────────────────────
+export const posts = sqliteTable("posts", {
+  id: int().primaryKey({ autoIncrement: true }),
+  title: text().notNull(),
+  slug: text().notNull().unique(),
+  description: text().notNull().default(""),
+  content: text().notNull().default(""),
+  tags: text({ mode: "json" }).notNull().$type<string[]>().default([]),
+  featured: int({ mode: "boolean" }).notNull().default(false),
+  draft: int({ mode: "boolean" }).notNull().default(true),
+  publishedAt: text()
+    .notNull()
+    .default(sql`(datetime('now'))`),
+  updatedAt: text(),
+  createdAt: text()
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 // ─── Admin Sessions ──────────────────────────────────────────────────
 export const adminSessions = sqliteTable("admin_sessions", {
   id: text().primaryKey(), // crypto.randomUUID()

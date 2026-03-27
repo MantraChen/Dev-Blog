@@ -1,5 +1,6 @@
 import type {
   projects,
+  posts,
   statuses,
   skills,
   timeline,
@@ -18,6 +19,9 @@ export type NewSkill = typeof skills.$inferInsert;
 
 export type TimelineEntry = typeof timeline.$inferSelect;
 export type NewTimelineEntry = typeof timeline.$inferInsert;
+
+export type Post = typeof posts.$inferSelect;
+export type NewPost = typeof posts.$inferInsert;
 
 export type AdminSession = typeof adminSessions.$inferSelect;
 
@@ -53,4 +57,17 @@ export interface TimelineItem {
   date: string;
   tags: string[] | null;
   url: string | null;
+}
+
+export interface PostItem {
+  id: number;
+  title: string;
+  slug: string;
+  description: string;
+  content: string;
+  tags: string[];
+  featured: boolean;
+  draft: boolean;
+  publishedAt: string;
+  updatedAt: string | null;
 }

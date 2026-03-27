@@ -1,24 +1,19 @@
 import rss from "@astrojs/rss";
-import { getCollection } from "astro:content";
+import { getPublishedPosts } from "@/db/queries";
 import type { APIContext } from "astro";
 
 export async function GET(context: APIContext) {
-  const posts = await getCollection("blog", ({ data }) => !data.draft);
+  const posts = await getPublishedPosts();
 
   return rss({
     title: "Dev Blog",
-    description: "个人技术博客",
+    description: "Personal tech blog",
     site: context.site!,
-    items: posts
-      .sort(
-        (a, b) =>
-          b.data.publishedAt.getTime() - a.data.publishedAt.getTime(),
-      )
-      .map((post) => ({
-        title: post.data.title,
-        pubDate: post.data.publishedAt,
-        description: post.data.description || post.data.title,
-        link: `/blog/${post.id}/`,
-      })),
+    items: posts.map((post) => ({
+      title: post.title,
+      pubDate: new Date(post.publishedAt),
+      description: post.description || post.title,
+      link: `/blog/${post.slug}/`,
+    })),
   });
 }

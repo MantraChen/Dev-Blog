@@ -1,12 +1,14 @@
 import { desc, eq, lt } from "drizzle-orm";
 import { db } from ".";
-import { projects, statuses, skills, timeline, adminSessions } from "./schema";
+import { projects, posts, statuses, skills, timeline, adminSessions } from "./schema";
 import type {
   ProjectItem,
+  PostItem,
   StatusItem,
   SkillItem,
   TimelineItem,
   NewProject,
+  NewPost,
   NewSkill,
   NewTimelineEntry,
 } from "./types";
@@ -127,6 +129,81 @@ export async function updateTimelineEntry(
 
 export async function deleteTimelineEntry(id: number) {
   return db.delete(timeline).where(eq(timeline.id, id));
+}
+
+// ─── Posts ───────────────────────────────────────────────────────────
+
+export async function getPublishedPosts(): Promise<PostItem[]> {
+  return db
+    .select({
+      id: posts.id,
+      title: posts.title,
+      slug: posts.slug,
+      description: posts.description,
+      content: posts.content,
+      tags: posts.tags,
+      featured: posts.featured,
+      draft: posts.draft,
+      publishedAt: posts.publishedAt,
+      updatedAt: posts.updatedAt,
+    })
+    .from(posts)
+    .where(eq(posts.draft, false))
+    .orderBy(desc(posts.publishedAt));
+}
+
+export async function getAllPosts(): Promise<PostItem[]> {
+  return db
+    .select({
+      id: posts.id,
+      title: posts.title,
+      slug: posts.slug,
+      description: posts.description,
+      content: posts.content,
+      tags: posts.tags,
+      featured: posts.featured,
+      draft: posts.draft,
+      publishedAt: posts.publishedAt,
+      updatedAt: posts.updatedAt,
+    })
+    .from(posts)
+    .orderBy(desc(posts.publishedAt));
+}
+
+export async function getPostBySlug(slug: string): Promise<PostItem | null> {
+  const rows = await db
+    .select({
+      id: posts.id,
+      title: posts.title,
+      slug: posts.slug,
+      description: posts.description,
+      content: posts.content,
+      tags: posts.tags,
+      featured: posts.featured,
+      draft: posts.draft,
+      publishedAt: posts.publishedAt,
+      updatedAt: posts.updatedAt,
+    })
+    .from(posts)
+    .where(eq(posts.slug, slug))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createPost(data: NewPost) {
+  return db.insert(posts).values(data).returning();
+}
+
+export async function updatePost(id: number, data: Partial<NewPost>) {
+  return db
+    .update(posts)
+    .set({ ...data, updatedAt: new Date().toISOString() })
+    .where(eq(posts.id, id))
+    .returning();
+}
+
+export async function deletePost(id: number) {
+  return db.delete(posts).where(eq(posts.id, id));
 }
 
 // ─── Admin Sessions ──────────────────────────────────────────────────
