@@ -21,13 +21,13 @@ const typeLabels: Record<string, string> = {
 
 <BaseLayout title="Timeline | Tech Blog" description="Career and learning timeline">
   <div class="max-w-2xl mx-auto py-10">
-    <h1 class="text-3xl font-bold tracking-tight mb-8">Timeline</h1>
+    <h1 class="text-3xl font-bold tracking-tight mb-8 reveal">Timeline</h1>
     {timelineItems.length === 0 && (
       <p class="text-muted-foreground text-center py-12">No timeline entries yet.</p>
     )}
     <div class="relative border-l border-muted ml-3 space-y-8">
       {timelineItems.map((item) => (
-        <div class="relative pl-8">
+        <div class="relative pl-8 reveal">
           <div class={`absolute -left-3 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${typeStyles[item.type] || "border-muted bg-muted/10"}`}>
             {item.type.charAt(0).toUpperCase()}
           </div>

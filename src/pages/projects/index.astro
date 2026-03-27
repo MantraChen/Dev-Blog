@@ -7,15 +7,15 @@ const projects = await getProjectList()
 
 <BaseLayout title="Projects | Tech Blog" description="Project showcase">
   <div class="max-w-4xl mx-auto py-10">
-    <h1 class="text-3xl font-bold tracking-tight mb-8">Projects</h1>
+    <h1 class="text-3xl font-bold tracking-tight mb-8 reveal">Projects</h1>
     <div class="grid gap-6 md:grid-cols-2">
       {projects.map((project) => (
-        <div class="rounded-lg border bg-card text-card-foreground p-6 flex flex-col gap-3">
+        <div class="rounded-lg p-6 flex flex-col gap-3 bg-muted/30 transition-all duration-300 ease-out hover:-translate-y-1 hover:bg-muted/60 reveal">
           <h3 class="text-xl font-semibold">{project.name}</h3>
           <p class="text-sm text-muted-foreground flex-1">{project.description}</p>
           <div class="flex gap-2 flex-wrap">
             {project.techStack.map((tech) => (
-              <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">{tech}</span>
+              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">{tech}</span>
             ))}
           </div>
           <div class="flex gap-3 mt-2">

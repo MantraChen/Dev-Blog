@@ -4,6 +4,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  --font-sans: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -89,5 +91,64 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
+}
+
+/* ─── Scroll Reveal ────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─── Reading Progress Bar ─────────────────────────────────────────── */
+#reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: hsl(var(--primary));
+  z-index: 100;
+  transition: width 50ms linear;
+}
+
+/* ─── Code Block Enhancements ──────────────────────────────────────── */
+.prose pre {
+  position: relative;
+  border-radius: 0.5rem;
+}
+
+.prose pre .copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  border-radius: 0.25rem;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.prose pre:hover .copy-btn {
+  opacity: 1;
+}
+
+.prose pre .copy-btn:hover {
+  background: hsl(var(--accent));
+}
+
+/* ─── View Transitions ─────────────────────────────────────────────── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
 }

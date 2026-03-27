@@ -7,8 +7,6 @@ const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export async function login(password: string): Promise<string | null> {
   const hash = process.env.ADMIN_PASSWORD_HASH || import.meta.env.ADMIN_PASSWORD_HASH;
-  console.log("[auth] hash from env:", JSON.stringify(hash));
-  console.log("[auth] password received:", JSON.stringify(password));
   if (!hash || !compareSync(password, hash)) {
     return null;
   }
