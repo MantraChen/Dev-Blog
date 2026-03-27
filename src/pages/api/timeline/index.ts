@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
-import { validateSession } from "@/lib/auth";
-import { getTimelineList, createTimelineEntry } from "@/db/queries";
+import { validateSession, getClientIp } from "@/lib/auth";
+import { getTimelineList, createTimelineEntry, createAuditLog } from "@/db/queries";
 
 export const GET: APIRoute = async () => {
   const entries = await getTimelineList();
@@ -26,6 +26,14 @@ export const POST: APIRoute = async ({ request }) => {
     tags: body.tags ?? null,
     url: body.url ?? null,
     sortOrder: body.sortOrder ?? 0,
+  });
+
+  await createAuditLog({
+    action: "timeline.create",
+    resource: "timeline",
+    resourceId: String(result[0].id),
+    detail: body.title,
+    ip: getClientIp(request),
   });
 
   return new Response(JSON.stringify(result[0]), {

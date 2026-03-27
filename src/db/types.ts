@@ -5,6 +5,7 @@ import type {
   skills,
   timeline,
   adminSessions,
+  auditLogs,
 } from "./schema";
 
 // ─── Row-level types (full DB row) ──────────────────────────────────
@@ -24,6 +25,9 @@ export type Post = typeof posts.$inferSelect;
 export type NewPost = typeof posts.$inferInsert;
 
 export type AdminSession = typeof adminSessions.$inferSelect;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type NewAuditLog = typeof auditLogs.$inferInsert;
 
 // ─── Frontend data contracts ────────────────────────────────────────
 export interface ProjectItem {

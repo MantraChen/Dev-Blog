@@ -79,3 +79,16 @@ export const adminSessions = sqliteTable("admin_sessions", {
     .notNull()
     .default(sql`(datetime('now'))`),
 });
+
+// ─── Audit Logs ─────────────────────────────────────────────────────
+export const auditLogs = sqliteTable("audit_logs", {
+  id: int().primaryKey({ autoIncrement: true }),
+  action: text().notNull(), // e.g. "post.create", "project.delete", "login.success"
+  resource: text(), // e.g. "post", "project", "skill"
+  resourceId: text(), // ID of the affected resource
+  detail: text(), // optional extra info (e.g. post title)
+  ip: text(), // client IP address
+  createdAt: text()
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});

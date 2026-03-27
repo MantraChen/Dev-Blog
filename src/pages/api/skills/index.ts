@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
-import { validateSession } from "@/lib/auth";
-import { getSkillList, createSkill } from "@/db/queries";
+import { validateSession, getClientIp } from "@/lib/auth";
+import { getSkillList, createSkill, createAuditLog } from "@/db/queries";
 
 export const GET: APIRoute = async () => {
   const skillList = await getSkillList();
@@ -24,6 +24,14 @@ export const POST: APIRoute = async ({ request }) => {
     level: body.level ?? 3,
     iconSlug: body.iconSlug ?? null,
     sortOrder: body.sortOrder ?? 0,
+  });
+
+  await createAuditLog({
+    action: "skill.create",
+    resource: "skill",
+    resourceId: String(result[0].id),
+    detail: body.name,
+    ip: getClientIp(request),
   });
 
   return new Response(JSON.stringify(result[0]), {

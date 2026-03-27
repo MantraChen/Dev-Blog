@@ -1,6 +1,6 @@
 import { desc, eq, lt } from "drizzle-orm";
 import { db } from ".";
-import { projects, posts, statuses, skills, timeline, adminSessions } from "./schema";
+import { projects, posts, statuses, skills, timeline, adminSessions, auditLogs } from "./schema";
 import type {
   ProjectItem,
   PostItem,
@@ -11,6 +11,7 @@ import type {
   NewPost,
   NewSkill,
   NewTimelineEntry,
+  NewAuditLog,
 } from "./types";
 
 // ─── Projects ────────────────────────────────────────────────────────
@@ -228,4 +229,18 @@ export async function deleteAdminSession(id: string) {
 export async function cleanExpiredSessions() {
   const now = new Date().toISOString();
   return db.delete(adminSessions).where(lt(adminSessions.expiresAt, now));
+}
+
+// ─── Audit Logs ─────────────────────────────────────────────────────
+
+export async function createAuditLog(data: NewAuditLog) {
+  return db.insert(auditLogs).values(data);
+}
+
+export async function getAuditLogs(limit = 50) {
+  return db
+    .select()
+    .from(auditLogs)
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit);
 }

@@ -5,6 +5,36 @@ import { createAdminSession, getAdminSession, deleteAdminSession, cleanExpiredSe
 const SESSION_COOKIE = "admin_session";
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// ─── Rate Limiting ──────────────────────────────────────────────────
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+const loginAttempts = new Map<string, { count: number; firstAttempt: number }>();
+
+export function checkRateLimit(ip: string): { allowed: boolean; retryAfterSeconds?: number } {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+
+  if (!record || now - record.firstAttempt > LOGIN_WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now });
+    return { allowed: true };
+  }
+
+  if (record.count >= LOGIN_MAX_ATTEMPTS) {
+    const retryAfter = Math.ceil((record.firstAttempt + LOGIN_WINDOW_MS - now) / 1000);
+    return { allowed: false, retryAfterSeconds: retryAfter };
+  }
+
+  record.count++;
+  return { allowed: true };
+}
+
+export function clearRateLimit(ip: string): void {
+  loginAttempts.delete(ip);
+}
+
+// ─── Login ──────────────────────────────────────────────────────────
+
 export async function login(password: string): Promise<string | null> {
   const hash = process.env.ADMIN_PASSWORD_HASH || import.meta.env.ADMIN_PASSWORD_HASH;
   if (!hash || !compareSync(password, hash)) {
@@ -60,4 +90,12 @@ export function clearSessionCookie(): string {
 function parseCookie(header: string, name: string): string | null {
   const match = header.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+export function getClientIp(request: Request): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
 }

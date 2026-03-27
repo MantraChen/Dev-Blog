@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
-import { validateSession } from "@/lib/auth";
-import { updateSkill, deleteSkill } from "@/db/queries";
+import { validateSession, getClientIp } from "@/lib/auth";
+import { updateSkill, deleteSkill, createAuditLog } from "@/db/queries";
 
 export const PUT: APIRoute = async ({ params, request }) => {
   if (!(await validateSession(request.headers.get("cookie")))) {
@@ -13,6 +13,14 @@ export const PUT: APIRoute = async ({ params, request }) => {
   const id = Number(params.id);
   const body = await request.json();
   const result = await updateSkill(id, body);
+
+  await createAuditLog({
+    action: "skill.update",
+    resource: "skill",
+    resourceId: String(id),
+    detail: body.name,
+    ip: getClientIp(request),
+  });
 
   return new Response(JSON.stringify(result[0] ?? null), {
     headers: { "Content-Type": "application/json" },
@@ -29,6 +37,13 @@ export const DELETE: APIRoute = async ({ params, request }) => {
 
   const id = Number(params.id);
   await deleteSkill(id);
+
+  await createAuditLog({
+    action: "skill.delete",
+    resource: "skill",
+    resourceId: String(id),
+    ip: getClientIp(request),
+  });
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: { "Content-Type": "application/json" },

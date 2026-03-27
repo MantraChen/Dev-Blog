@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
-import { validateSession } from "@/lib/auth";
-import { updateTimelineEntry, deleteTimelineEntry } from "@/db/queries";
+import { validateSession, getClientIp } from "@/lib/auth";
+import { updateTimelineEntry, deleteTimelineEntry, createAuditLog } from "@/db/queries";
 
 export const PUT: APIRoute = async ({ params, request }) => {
   if (!(await validateSession(request.headers.get("cookie")))) {
@@ -13,6 +13,14 @@ export const PUT: APIRoute = async ({ params, request }) => {
   const id = Number(params.id);
   const body = await request.json();
   const result = await updateTimelineEntry(id, body);
+
+  await createAuditLog({
+    action: "timeline.update",
+    resource: "timeline",
+    resourceId: String(id),
+    detail: body.title,
+    ip: getClientIp(request),
+  });
 
   return new Response(JSON.stringify(result[0] ?? null), {
     headers: { "Content-Type": "application/json" },
@@ -29,6 +37,13 @@ export const DELETE: APIRoute = async ({ params, request }) => {
 
   const id = Number(params.id);
   await deleteTimelineEntry(id);
+
+  await createAuditLog({
+    action: "timeline.delete",
+    resource: "timeline",
+    resourceId: String(id),
+    ip: getClientIp(request),
+  });
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: { "Content-Type": "application/json" },

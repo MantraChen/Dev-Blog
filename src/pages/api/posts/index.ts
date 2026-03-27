@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
-import { validateSession } from "@/lib/auth";
-import { getAllPosts, createPost } from "@/db/queries";
+import { validateSession, getClientIp } from "@/lib/auth";
+import { getAllPosts, createPost, createAuditLog } from "@/db/queries";
 
 export const GET: APIRoute = async ({ request }) => {
   if (!(await validateSession(request.headers.get("cookie")))) {
@@ -34,6 +34,14 @@ export const POST: APIRoute = async ({ request }) => {
     featured: body.featured ?? false,
     draft: body.draft ?? true,
     publishedAt: body.publishedAt ?? new Date().toISOString(),
+  });
+
+  await createAuditLog({
+    action: "post.create",
+    resource: "post",
+    resourceId: String(result[0].id),
+    detail: body.title,
+    ip: getClientIp(request),
   });
 
   return new Response(JSON.stringify(result[0]), {

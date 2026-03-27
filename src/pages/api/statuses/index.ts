@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
-import { validateSession } from "@/lib/auth";
-import { getLatestStatuses, createStatus } from "@/db/queries";
+import { validateSession, getClientIp } from "@/lib/auth";
+import { getLatestStatuses, createStatus, createAuditLog } from "@/db/queries";
 
 export const GET: APIRoute = async ({ url }) => {
   const limit = Number(url.searchParams.get("limit")) || 20;
@@ -20,6 +20,14 @@ export const POST: APIRoute = async ({ request }) => {
 
   const body = await request.json();
   const result = await createStatus(body.text);
+
+  await createAuditLog({
+    action: "status.create",
+    resource: "status",
+    resourceId: String(result[0].id),
+    detail: body.text,
+    ip: getClientIp(request),
+  });
 
   return new Response(JSON.stringify(result[0]), {
     status: 201,
