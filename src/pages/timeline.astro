@@ -11,6 +11,8 @@ const typeStyles: Record<string, string> = {
   learning: "border-green-500 bg-green-500/10",
 }
 
+Astro.response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400')
+
 const typeLabels: Record<string, string> = {
   career: "Career",
   education: "Education",

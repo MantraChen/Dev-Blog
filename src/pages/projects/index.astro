@@ -3,6 +3,8 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getProjectList } from "@/db/queries"
 
 const projects = await getProjectList()
+
+Astro.response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400')
 ---
 
 <BaseLayout title="Projects | Tech Blog" description="Project showcase">

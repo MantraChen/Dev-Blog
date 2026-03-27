@@ -12,6 +12,8 @@ const grouped = skills.reduce<Record<string, typeof skills>>((acc, skill) => {
 }, {})
 
 const categories = Object.entries(grouped)
+
+Astro.response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400')
 ---
 
 <BaseLayout title="Skills | Tech Blog" description="Technical skills and proficiency">

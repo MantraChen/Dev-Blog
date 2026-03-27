@@ -4,18 +4,23 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
 
 const { slug } = Astro.params
 
-const allPosts = await getCollection("blog")
+const allPosts = await getCollection("blog", ({ data }) => !data.draft)
 const entry = allPosts.find((p) => p.id === slug)
 
 if (!entry) {
   return Astro.redirect("/blog")
 }
 
-const { Content, headings } = await render(entry)
+const { Content, headings, remarkPluginFrontmatter } = await render(entry)
 const tocHeadings = headings.filter((h) => h.depth <= 3)
+
+// Auto-generate description from body if not explicitly provided
+const description = entry.data.description || (entry.body ? entry.body.replace(/[#*`>\-\[\]()!{}\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150) + '…' : entry.data.title)
+
+Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=3600')
 ---
 
-<BaseLayout title={`${entry.data.title} | Blog`} description={entry.data.description}>
+<BaseLayout title={`${entry.data.title} | Blog`} description={description}>
   <!-- Reading Progress Bar -->
   <div id="reading-progress"></div>
 
