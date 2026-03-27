@@ -13,6 +13,11 @@ yarn-error.log*
 pnpm-debug.log*
 
 
+# database (contains personal content)
+data.db
+data.db-shm
+data.db-wal
+
 # environment variables
 .env
 .env.production

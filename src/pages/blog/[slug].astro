@@ -1,6 +1,6 @@
 ---
 import BaseLayout from "@/components/layout/BaseLayout.astro"
-import { getPostBySlug } from "@/db/queries"
+import { getPostBySlug, getPostViewCount, recordPostView, getAdjacentPosts } from "@/db/queries"
 import { marked } from "@/lib/markdown"
 
 const { slug } = Astro.params
@@ -10,6 +10,11 @@ const post = await getPostBySlug(slug!)
 if (!post || post.draft) {
   return Astro.redirect("/blog")
 }
+
+// 记录浏览量并获取计数和前后文章
+await recordPostView(slug!)
+const viewCount = await getPostViewCount(slug!)
+const { prev, next } = await getAdjacentPosts(slug!)
 
 // Render markdown to HTML
 const htmlContent = await marked.parse(post.content)
@@ -43,9 +48,13 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
     <article class="flex-1 min-w-0">
       <header class="mb-10 reveal">
         <h1 class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4">{post.title}</h1>
-        <time class="text-muted-foreground">
-          {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-        </time>
+        <div class="flex items-center gap-4 text-muted-foreground">
+          <time>
+            {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+          </time>
+          <span>·</span>
+          <span>{viewCount} 次阅读</span>
+        </div>
         <div class="flex flex-wrap gap-2 mt-4">
           {post.tags.map((tag) => (
             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">{tag}</span>
@@ -55,6 +64,41 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
       <div class="prose prose-zinc dark:prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:rounded-lg prose-lead:leading-relaxed reveal">
         <Fragment set:html={htmlContent} />
       </div>
+
+      <!-- 上一篇/下一篇导航 -->
+      <nav class="mt-12 flex justify-between items-center border-t border-border pt-6">
+        {prev ? (
+          <a href={`/blog/${prev.slug}`} class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            ← {prev.title}
+          </a>
+        ) : <span />}
+        {next ? (
+          <a href={`/blog/${next.slug}`} class="text-sm text-muted-foreground hover:text-foreground transition-colors text-right">
+            {next.title} →
+          </a>
+        ) : <span />}
+      </nav>
+
+      <!-- Giscus 评论 -->
+      <section class="mt-12">
+        <script
+          src="https://giscus.app/client.js"
+          data-repo="MantraChen/Dev-Blog"
+          data-repo-id="R_kgDORxxsSQ"
+          data-category="Announcements"
+          data-category-id="DIC_kwDORxxsSc4C5bq6"
+          data-mapping="pathname"
+          data-strict="1"
+          data-reactions-enabled="1"
+          data-emit-metadata="0"
+          data-input-position="top"
+          data-theme="preferred_color_scheme"
+          data-lang="zh-CN"
+          data-loading="lazy"
+          crossorigin="anonymous"
+          async
+        ></script>
+      </section>
     </article>
 
     <!-- Table of Contents (desktop sidebar) -->

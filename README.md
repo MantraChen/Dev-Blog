@@ -6,35 +6,53 @@ A personal technical blog built with Astro 6 SSR, showcasing projects in concurr
 
 - **Framework**: Astro 6 SSR + Node.js standalone adapter
 - **Database**: SQLite (better-sqlite3) + Drizzle ORM
-- **Styling**: Tailwind CSS v4 + shadcn/ui design system
-- **Content**: Markdown blog posts stored in SQLite, rendered server-side via `marked`. KaTeX math support via remark-math/rehype-katex for MDX content.
-- **Islands**: React 19 (minimal client JS — only TagFilter, ThemeToggle, AdminApp)
+- **Styling**: Tailwind CSS v4 + custom design tokens
+- **Content**: Markdown blog posts stored in SQLite, rendered server-side via `marked` with highlight.js code highlighting and KaTeX math rendering
+- **Islands**: React 19 (minimal client JS — TagFilter with search, ThemeToggle, AdminApp)
+- **Comments**: Giscus (GitHub Discussions)
 
 ## Features
 
-- **Blog**: Full admin CRUD, markdown editor with live preview, code highlighting, math formulas (KaTeX), reading progress bar, TOC sidebar
-- **Interactive MDX components**: `<SpatialTree />` and `<MemoryLayout />` for technical deep-dives (via Astro Content Collections)
+### Blog
+- Full admin CRUD with markdown editor and live preview
+- Code syntax highlighting (highlight.js, github-dark theme)
+- Math formula rendering (KaTeX, inline `$...$` and block `$$...$$`)
+- Full-text search with 300ms debounce
+- Tag-based filtering
+- View count tracking per post
+- Previous/next post navigation
+- Reading progress bar and TOC sidebar
+- Giscus comment system
+
+### Content Management
 - **Project showcase, skills overview, career timeline** — all backed by SQLite
 - **Admin panel**: Session-based auth (bcrypt + HttpOnly cookies), 5 tabs — Blog, Projects, Statuses, Skills, Timeline
-- **RSS feed, sitemap, SEO** meta/OG tags
-- **Dark mode**, View Transitions, scroll reveal animations
-- **SSR cache headers** on static-ish pages (skills, timeline, projects, blog posts)
+
+### Security
+- Login rate limiting (5 attempts per 15 minutes per IP)
+- Audit logging on all admin operations (create/update/delete + login events)
+- HttpOnly session cookies with 7-day expiry
+
+### Performance & SEO
+- SSR cache headers on all public pages (Cache-Control + stale-while-revalidate)
+- RSS feed, sitemap, SEO meta/OG tags
+- Dark mode, View Transitions, scroll reveal animations
 
 ## Project Structure
 
 ```
 src/
-  content/blog/          # MDX posts with interactive components (optional)
   components/
     layout/              # BaseLayout, Nav
-    blog/                # TagFilter (React island)
-    mdx/                 # SpatialTree, MemoryLayout (React islands)
+    blog/                # TagFilter with search (React island)
     admin/               # AdminApp (React island)
+    ThemeToggle.tsx       # Dark/light mode toggle
   db/
-    schema.ts            # Drizzle schema (posts, projects, statuses, skills, timeline, admin_sessions)
-    queries.ts           # Database queries
+    schema.ts            # Drizzle schema (posts, postViews, projects, statuses, skills, timeline, adminSessions, auditLogs)
+    queries.ts           # Database queries (CRUD, search, view counts, audit logs)
+    types.ts             # TypeScript interfaces
   pages/
-    api/                 # REST API routes (auth, posts, projects, statuses, skills, timeline)
+    api/                 # REST API routes (auth, posts, posts/search, posts/views, projects, statuses, skills, timeline)
     blog/                # Blog list + [slug] detail
     projects/            # Project showcase
     admin/               # Login + admin panel
@@ -42,10 +60,10 @@ src/
     timeline.astro       # Career timeline
     rss.xml.ts           # RSS feed
   lib/
-    auth.ts              # Session management
-    markdown.ts          # Configured marked renderer (heading IDs, GFM)
+    auth.ts              # Session management, rate limiting, IP extraction
+    markdown.ts          # Configured marked renderer (highlight.js + KaTeX + heading IDs + GFM)
     utils.ts             # cn() helper
-  styles/globals.css     # Tailwind + shadcn/ui CSS variables
+  styles/globals.css     # Tailwind + CSS custom properties
 ```
 
 ## Commands
