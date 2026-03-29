@@ -12,12 +12,12 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-r
     <h1 class="text-3xl font-bold tracking-tight mb-8 reveal">Projects</h1>
     <div class="grid gap-6 md:grid-cols-2">
       {projects.map((project) => (
-        <div class="rounded-lg p-6 flex flex-col gap-3 bg-muted/30 transition-all duration-300 ease-out hover:-translate-y-1 hover:bg-muted/60 reveal">
+        <div class="group rounded-lg p-6 flex flex-col gap-3 bg-muted/30 transition-all duration-300 ease-out hover:-translate-y-1 hover:bg-muted/60 reveal hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 border border-transparent hover:border-primary/20">
           <h3 class="text-xl font-semibold">{project.name}</h3>
           <p class="text-sm text-muted-foreground flex-1">{project.description}</p>
           <div class="flex gap-2 flex-wrap">
             {project.techStack.map((tech) => (
-              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">{tech}</span>
+              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">{tech}</span>
             ))}
           </div>
           <div class="flex gap-3 mt-2">

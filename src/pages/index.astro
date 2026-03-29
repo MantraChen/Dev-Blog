@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getLatestStatuses, getProjectList, getSkillList, getPublishedPosts } from "@/db/queries"
+import { estimateReadingTime } from "@/lib/utils"
 
 const statuses = await getLatestStatuses(1)
 const projects = await getProjectList()
@@ -16,16 +17,18 @@ const topSkills = skills.slice(0, 8)
   <section class="space-y-8 pb-8 pt-6 md:pb-12 md:pt-10 lg:py-24">
     <div class="flex max-w-[64rem] flex-col items-start gap-6">
 
-      <div>
+      <div class="hero-animate" style="animation-delay: 0ms">
         <h1 class="font-heading text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4">
           Hi, I'm Mantra Chen.
         </h1>
         <p class="max-w-[42rem] leading-normal text-muted-foreground sm:text-xl sm:leading-8">
-          CTO & Systems Developer. Writing C++, Java, Python, and Rust to build systems that are fast and unbreakable. Specializing in extreme-performance algorithms and kernel-space security.
+          CTO & Systems Developer.
+          Writing C++, Java, Python, and Rust to build systems that are fast and unbreakable.
+          Specializing in extreme-performance algorithms and kernel-space security.
         </p>
       </div>
 
-      <div class="max-w-[42rem] p-5 border rounded-lg bg-zinc-50 dark:bg-zinc-900/50 relative overflow-hidden group">
+      <div class="max-w-[42rem] p-5 border rounded-lg bg-zinc-50 dark:bg-zinc-900/50 relative overflow-hidden group hero-animate" style="animation-delay: 150ms">
         <div class="absolute w-1 h-full bg-zinc-300 dark:bg-zinc-700 left-0 top-0 transition-colors group-hover:bg-foreground"></div>
         <h2 class="text-sm font-semibold uppercase tracking-wider text-foreground mb-2">Why this blog?</h2>
         <p class="text-sm text-muted-foreground leading-relaxed">
@@ -34,7 +37,7 @@ const topSkills = skills.slice(0, 8)
         </p>
       </div>
 
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-4 hero-animate" style="animation-delay: 300ms">
         <a
           href="https://github.com/mantrachen"
           target="_blank"
@@ -69,12 +72,25 @@ const topSkills = skills.slice(0, 8)
       </div>
       <div class="flex flex-col gap-4">
         {recentPosts.map((post) => (
-          <a href={`/blog/${post.slug}`} class="group flex flex-col gap-2 rounded-lg border bg-card p-5 transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-sm dark:hover:shadow-zinc-800/50 hover:border-zinc-300 dark:hover:border-zinc-700">
-            <h3 class="font-semibold group-hover:text-primary transition-colors">{post.title}</h3>
-            <p class="text-sm text-muted-foreground line-clamp-2">{post.description}</p>
-            <time class="text-xs text-muted-foreground mt-2">
-              {new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-            </time>
+          <a href={`/blog/${post.slug}`} class="group flex flex-col rounded-lg border bg-card transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-sm dark:hover:shadow-zinc-800/50 hover:border-zinc-300 dark:hover:border-zinc-700 overflow-hidden">
+            {post.coverImage && (
+              <img
+                src={post.coverImage}
+                alt={post.title}
+                class="w-full h-32 aspect-video object-cover border-b border-border bg-muted/50"
+              />
+            )}
+            <div class="p-5 flex flex-col gap-2">
+              <h3 class="font-semibold group-hover:text-primary transition-colors">{post.title}</h3>
+              <p class="text-sm text-muted-foreground line-clamp-2">{post.description}</p>
+              <div class="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                <time>
+                  {new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </time>
+                <span>·</span>
+                <span>{estimateReadingTime(post.content)} min read</span>
+              </div>
+            </div>
           </a>
         ))}
         {recentPosts.length === 0 && (
@@ -93,7 +109,7 @@ const topSkills = skills.slice(0, 8)
         </div>
         <div class="grid gap-4">
           {topProjects.map((project) => (
-            <div class="rounded-lg border bg-card text-card-foreground transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-sm dark:hover:shadow-zinc-800/50">
+            <div class="group rounded-lg border bg-card text-card-foreground border-transparent hover:border-primary/20 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10">
               <div class="p-5 pb-3">
                 <div class="text-lg font-semibold flex items-center justify-between">
                   {project.name}
@@ -107,7 +123,7 @@ const topSkills = skills.slice(0, 8)
               </div>
               <div class="p-5 pt-0 flex gap-2 flex-wrap">
                 {project.techStack.map((tech: string) => (
-                  <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-normal bg-secondary/50 text-secondary-foreground">{tech}</span>
+                  <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-normal bg-secondary/50 text-secondary-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">{tech}</span>
                 ))}
               </div>
             </div>

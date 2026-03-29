@@ -2,10 +2,17 @@
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { TagFilter } from "@/components/blog/TagFilter"
 import { getPublishedPosts } from "@/db/queries"
+import { estimateReadingTime } from "@/lib/utils"
 
 const posts = await getPublishedPosts()
 
 const allTags = [...new Set(posts.flatMap((p) => p.tags))]
+
+// 计算标签频率
+const tagCounts: Record<string, number> = {}
+posts.forEach(p => p.tags.forEach(t => {
+  tagCounts[t] = (tagCounts[t] || 0) + 1
+}))
 
 const serializedPosts = posts.map((post) => ({
   id: post.slug,
@@ -13,12 +20,14 @@ const serializedPosts = posts.map((post) => ({
   description: post.description || "",
   tags: post.tags,
   publishedAt: post.publishedAt,
+  coverImage: post.coverImage,
+  readingTime: estimateReadingTime(post.content)
 }))
 ---
 
 <BaseLayout title="Blog | Tech Blog" description="Technical articles and notes">
   <div class="max-w-3xl mx-auto py-10">
     <h1 class="text-3xl font-bold tracking-tight mb-8">Blog</h1>
-    <TagFilter posts={serializedPosts} tags={allTags} client:load />
+    <TagFilter posts={serializedPosts} tags={allTags} tagCounts={tagCounts} client:load />
   </div>
 </BaseLayout>

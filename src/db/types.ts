@@ -68,6 +68,7 @@ export interface PostItem {
   title: string;
   slug: string;
   description: string;
+  coverImage: string | null;
   content: string;
   tags: string[];
   featured: boolean;

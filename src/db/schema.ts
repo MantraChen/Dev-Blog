@@ -67,6 +67,7 @@ export const posts = sqliteTable("posts", {
   title: text().notNull(),
   slug: text().notNull().unique(),
   description: text().notNull().default(""),
+  coverImage: text(),
   content: text().notNull().default(""),
   tags: text({ mode: "json" }).notNull().$type<string[]>().default([]),
   featured: int({ mode: "boolean" }).notNull().default(false),

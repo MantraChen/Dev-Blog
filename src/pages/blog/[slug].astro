@@ -2,6 +2,7 @@
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getPostBySlug, getPostViewCount, recordPostView, getAdjacentPosts } from "@/db/queries"
 import { marked } from "@/lib/markdown"
+import { estimateReadingTime } from "@/lib/utils"
 
 const { slug } = Astro.params
 
@@ -15,6 +16,9 @@ if (!post || post.draft) {
 await recordPostView(slug!)
 const viewCount = await getPostViewCount(slug!)
 const { prev, next } = await getAdjacentPosts(slug!)
+
+// 计算阅读时间
+const readingTime = estimateReadingTime(post.content)
 
 // Render markdown to HTML
 const htmlContent = await marked.parse(post.content)
@@ -40,21 +44,29 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
 ---
 
 <BaseLayout title={`${post.title} | Blog`} description={description}>
-  <!-- Reading Progress Bar -->
   <div id="reading-progress"></div>
 
   <div class="max-w-4xl mx-auto py-10 flex gap-10">
-    <!-- Article -->
     <article class="flex-1 min-w-0">
       <header class="mb-10 reveal">
+        {post.coverImage && (
+          <img
+            src={post.coverImage}
+            alt={post.title}
+            class="w-full aspect-video rounded-lg object-cover mb-6 border border-border"
+          />
+        )}
         <h1 class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4">{post.title}</h1>
         <div class="flex items-center gap-4 text-muted-foreground">
           <time>
             {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
           </time>
           <span>·</span>
+          <span>{readingTime} min read</span>
+          <span>·</span>
           <span>{viewCount} 次阅读</span>
         </div>
+
         <div class="flex flex-wrap gap-2 mt-4">
           {post.tags.map((tag) => (
             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">{tag}</span>
@@ -65,7 +77,6 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         <Fragment set:html={htmlContent} />
       </div>
 
-      <!-- 上一篇/下一篇导航 -->
       <nav class="mt-12 flex justify-between items-center border-t border-border pt-6">
         {prev ? (
           <a href={`/blog/${prev.slug}`} class="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -79,7 +90,6 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         ) : <span />}
       </nav>
 
-      <!-- Giscus 评论 -->
       <section class="mt-12">
         <script
           src="https://giscus.app/client.js"
@@ -101,7 +111,6 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
       </section>
     </article>
 
-    <!-- Table of Contents (desktop sidebar) -->
     {tocHeadings.length > 0 && (
       <aside class="hidden lg:block w-56 shrink-0">
         <nav class="sticky top-20">
@@ -124,7 +133,51 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
     )}
   </div>
 
-  <!-- Reading progress + code copy + TOC highlight -->
+  {tocHeadings.length > 0 && (
+    <>
+      <button
+        id="mobile-toc-btn"
+        class="lg:hidden fixed bottom-20 right-6 z-40 h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors"
+        aria-label="Table of Contents"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" x2="21" y1="6" y2="6"/>
+          <line x1="8" x2="21" y1="12" y2="12"/>
+          <line x1="8" x2="21" y1="18" y2="18"/>
+          <line x1="3" x2="3.01" y1="6" y2="6"/>
+          <line x1="3" x2="3.01" y1="12" y2="12"/>
+          <line x1="3" x2="3.01" y1="18" y2="18"/>
+        </svg>
+      </button>
+
+      <div id="toc-overlay" class="fixed inset-0 bg-black/50 z-40 hidden opacity-0 transition-opacity duration-300 lg:hidden"></div>
+
+      <div id="toc-drawer" class="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border rounded-t-xl max-h-[60vh] flex flex-col translate-y-full transition-transform duration-300 ease-out lg:hidden">
+        <div class="flex items-center justify-between p-4 border-b border-border shrink-0">
+          <span class="font-semibold text-foreground">On this page</span>
+          <button id="toc-close-btn" class="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors" aria-label="Close">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <div class="overflow-y-auto p-4">
+          <ul class="space-y-2 text-sm">
+            {tocHeadings.map((h) => (
+              <li class={h.depth === 3 ? "pl-4" : ""}>
+                <a
+                  href={`#${h.slug}`}
+                  class="mobile-toc-link block py-2 text-muted-foreground hover:text-foreground transition-colors"
+                  data-slug={h.slug}
+                >
+                  {h.text}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </>
+  )}
+
   <script is:inline>
     function initBlogEnhancements() {
       // Reading progress bar
@@ -154,13 +207,12 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         pre.appendChild(btn);
       });
 
-      // TOC active heading highlight
+      // TOC active heading highlight (Desktop)
       const tocLinks = document.querySelectorAll('.toc-link');
       if (tocLinks.length > 0) {
         const headingEls = Array.from(tocLinks).map(l =>
           document.getElementById(l.dataset.slug)
         ).filter(Boolean);
-
         const observer = new IntersectionObserver((entries) => {
           entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -170,11 +222,63 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
             }
           });
         }, { rootMargin: '-80px 0px -60% 0px' });
-
         headingEls.forEach(el => observer.observe(el));
       }
     }
+
+    // Mobile TOC Logic
+    function initMobileTOC() {
+      const btn = document.getElementById('mobile-toc-btn');
+      const overlay = document.getElementById('toc-overlay');
+      const drawer = document.getElementById('toc-drawer');
+      const closeBtn = document.getElementById('toc-close-btn');
+      const mobileLinks = document.querySelectorAll('.mobile-toc-link');
+
+      if (!btn || !overlay || !drawer) return;
+
+      const openDrawer = () => {
+        overlay.classList.remove('hidden');
+        // Force reflow
+        void overlay.offsetWidth;
+        overlay.classList.remove('opacity-0');
+        drawer.classList.remove('translate-y-full');
+      };
+
+      const closeDrawer = () => {
+        drawer.classList.add('translate-y-full');
+        overlay.classList.add('opacity-0');
+        setTimeout(() => {
+          overlay.classList.add('hidden');
+        }, 300);
+      };
+
+      btn.addEventListener('click', openDrawer);
+      overlay.addEventListener('click', closeDrawer);
+      if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+
+      mobileLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          closeDrawer();
+
+          const targetId = link.getAttribute('href').substring(1);
+          const targetEl = document.getElementById(targetId);
+          if (targetEl) {
+            setTimeout(() => {
+              targetEl.scrollIntoView({ behavior: 'smooth' });
+              history.pushState(null, null, `#${targetId}`);
+            }, 100);
+          }
+        });
+      });
+    }
+
     initBlogEnhancements();
-    document.addEventListener('astro:after-swap', initBlogEnhancements);
+    initMobileTOC();
+
+    document.addEventListener('astro:after-swap', () => {
+      initBlogEnhancements();
+      initMobileTOC();
+    });
   </script>
 </BaseLayout>
