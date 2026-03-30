@@ -3,6 +3,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getPostBySlug, getPostViewCount, recordPostView, getAdjacentPosts } from "@/db/queries"
 import { marked } from "@/lib/markdown"
 import { estimateReadingTime } from "@/lib/utils"
+import { ReactionBar } from "@/components/blog/ReactionBar"
 
 const { slug } = Astro.params
 
@@ -101,6 +102,8 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
       <div class="prose prose-zinc dark:prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:rounded-lg prose-lead:leading-relaxed reveal">
         <Fragment set:html={htmlContent} />
       </div>
+
+      <ReactionBar slug={slug!} client:idle />
 
       <nav class="mt-12 flex justify-between items-center border-t border-border pt-6">
         {prev ? (

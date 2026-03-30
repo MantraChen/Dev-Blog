@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 
-type Tab = "blog" | "projects" | "statuses" | "skills" | "timeline";
+type Tab = "blog" | "projects" | "statuses" | "skills" | "timeline" | "friends" | "stats";
 
 export function AdminApp() {
   const [activeTab, setActiveTab] = useState<Tab>("blog");
@@ -11,16 +11,18 @@ export function AdminApp() {
     { value: "statuses", label: "Statuses" },
     { value: "skills", label: "Skills" },
     { value: "timeline", label: "Timeline" },
+    { value: "friends", label: "Friends" },
+    { value: "stats", label: "Stats" },
   ];
 
   return (
     <div>
-      <div className="flex border-b mb-6">
+      <div className="flex border-b mb-6 overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === tab.value
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -36,6 +38,8 @@ export function AdminApp() {
       {activeTab === "statuses" && <StatusesPanel />}
       {activeTab === "skills" && <SkillsPanel />}
       {activeTab === "timeline" && <TimelinePanel />}
+      {activeTab === "friends" && <FriendsPanel />}
+      {activeTab === "stats" && <StatsPanel />}
     </div>
   );
 }
@@ -740,6 +744,182 @@ function TimelinePanel() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ─── Friends ────────────────────────────────────────────────────────
+
+function FriendsPanel() {
+  const [items, setItems] = useState<any[]>([]);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/friends");
+    if (res.ok) setItems(await res.json());
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const body = {
+      name: fd.get("name") as string,
+      url: fd.get("url") as string,
+      avatar: (fd.get("avatar") as string) || null,
+      description: (fd.get("description") as string) || null,
+      sortOrder: Number(fd.get("sortOrder")) || 0,
+    };
+
+    if (editing) {
+      await fetch(`/api/friends/${editing.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } else {
+      await fetch("/api/friends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    }
+    setEditing(null);
+    setShowForm(false);
+    load();
+  };
+
+  const remove = async (id: number) => {
+    if (!confirm("Delete this friend link?")) return;
+    await fetch(`/api/friends/${id}`, { method: "DELETE" });
+    load();
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">Friends</h2>
+        <button
+          onClick={() => { setEditing(null); setShowForm(!showForm); }}
+          className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          {showForm ? "Cancel" : "Add Friend"}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={save} className="border rounded-lg p-4 mb-6 space-y-3">
+          <div className="flex gap-3">
+            <input name="name" placeholder="Name" defaultValue={editing?.name || ""} required className="flex h-9 flex-1 rounded-md border bg-transparent px-3 text-sm" />
+            <input name="url" placeholder="URL" defaultValue={editing?.url || ""} required className="flex h-9 flex-1 rounded-md border bg-transparent px-3 text-sm" />
+          </div>
+          <input name="avatar" placeholder="Avatar URL (optional)" defaultValue={editing?.avatar || ""} className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm" />
+          <input name="description" placeholder="Description (optional)" defaultValue={editing?.description || ""} className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm" />
+          <input name="sortOrder" type="number" placeholder="Sort order" defaultValue={editing?.sortOrder || 0} className="flex h-9 w-32 rounded-md border bg-transparent px-3 text-sm" />
+          <button type="submit" className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
+            {editing ? "Update" : "Create"}
+          </button>
+        </form>
+      )}
+
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left py-2 font-medium">Name</th>
+            <th className="text-left py-2 font-medium">URL</th>
+            <th className="text-left py-2 font-medium">Description</th>
+            <th className="text-right py-2 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((f) => (
+            <tr key={f.id} className="border-b">
+              <td className="py-2 font-medium flex items-center gap-2">
+                {f.avatar && <img src={f.avatar} alt="" className="w-6 h-6 rounded-full object-cover" />}
+                {f.name}
+              </td>
+              <td className="py-2 text-muted-foreground">
+                <a href={f.url} target="_blank" rel="noreferrer" className="hover:underline">{f.url}</a>
+              </td>
+              <td className="py-2 text-muted-foreground truncate max-w-[200px]">{f.description}</td>
+              <td className="py-2 text-right space-x-2">
+                <button onClick={() => { setEditing(f); setShowForm(true); }} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
+                <button onClick={() => remove(f.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Stats ──────────────────────────────────────────────────────────
+
+function StatsPanel() {
+  const [stats, setStats] = useState<any>(null);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/stats");
+    if (res.ok) setStats(await res.json());
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (!stats) return <div className="text-sm text-muted-foreground">Loading stats...</div>;
+
+  const maxViews = Math.max(...(stats.dailyViews?.map((d: any) => d.views) || [0]), 1);
+
+  return (
+    <div className="space-y-6">
+      <div className="p-6 border rounded-lg bg-card text-card-foreground shadow-sm">
+        <h3 className="text-sm font-medium text-muted-foreground">Total Views</h3>
+        <p className="text-3xl font-bold mt-2">{stats.totalViews?.toLocaleString() || 0}</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Top Posts */}
+        <div className="border rounded-lg p-4">
+          <h3 className="text-sm font-medium mb-4">Top Posts</h3>
+          <div className="space-y-3">
+            {stats.topPosts?.map((post: any, index: number) => (
+              <div key={post.slug} className="flex justify-between items-center text-sm">
+                <div className="flex gap-3 items-center truncate pr-4">
+                  <span className="text-muted-foreground font-mono w-4">{index + 1}.</span>
+                  <a href={`/blog/${post.slug}`} target="_blank" rel="noreferrer" className="hover:underline truncate">
+                    {post.title}
+                  </a>
+                </div>
+                <span className="font-medium shrink-0">{post.views.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Daily Views Bar Chart */}
+        <div className="border rounded-lg p-4 flex flex-col">
+          <h3 className="text-sm font-medium mb-4">Views (Last 30 Days)</h3>
+          <div className="flex items-end gap-[2px] h-[120px] mt-auto">
+            {stats.dailyViews?.map((day: any) => (
+              <div
+                key={day.date}
+                title={`${day.date}: ${day.views} views`}
+                className="bg-primary/60 hover:bg-primary transition-colors flex-1 rounded-t-sm"
+                style={{
+                  height: `${(day.views / maxViews) * 100}%`,
+                  minHeight: day.views > 0 ? '4px' : '1px'
+                }}
+              />
+            ))}
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+            <span>{stats.dailyViews?.[0]?.date}</span>
+            <span>{stats.dailyViews?.[stats.dailyViews.length - 1]?.date}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
