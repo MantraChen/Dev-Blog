@@ -20,13 +20,16 @@ A personal technical blog built with Astro 6 SSR, showcasing projects in concurr
 - Full-text search with 300ms debounce
 - Tag-based filtering
 - View count tracking per post
+- Emoji reactions per post (👍 🎉 ❤️ 🚀 👀 🤔)
 - Previous/next post navigation
 - Reading progress bar and TOC sidebar
 - Giscus comment system
+- Archive page (posts grouped by year/month)
 
 ### Content Management
-- **Project showcase, skills overview, career timeline** — all backed by SQLite
-- **Admin panel**: Session-based auth (bcrypt + HttpOnly cookies), 5 tabs — Blog, Projects, Statuses, Skills, Timeline
+- **Project showcase, skills overview, career timeline, blogroll (friends)** — all backed by SQLite
+- **Admin panel**: Session-based auth (bcrypt + HttpOnly cookies), 7 tabs — Blog, Projects, Statuses, Skills, Timeline, Friends, Stats
+- **Stats dashboard**: Total views, top posts ranking, daily views bar chart (last 30 days)
 
 ### Security
 - Login rate limiting (5 attempts per 15 minutes per IP)
@@ -44,21 +47,24 @@ A personal technical blog built with Astro 6 SSR, showcasing projects in concurr
 src/
   components/
     layout/              # BaseLayout, Nav
-    blog/                # TagFilter with search (React island)
-    admin/               # AdminApp (React island)
+    blog/                # TagFilter with search, ReactionBar (React islands)
+    admin/               # AdminApp (React island, 7 tabs)
     ThemeToggle.tsx       # Dark/light mode toggle
   db/
-    schema.ts            # Drizzle schema (posts, postViews, projects, statuses, skills, timeline, adminSessions, auditLogs)
-    queries.ts           # Database queries (CRUD, search, view counts, audit logs)
+    schema.ts            # Drizzle schema (posts, postViews, projects, statuses, skills, timeline, friends, reactions, adminSessions, auditLogs)
+    queries.ts           # Database queries (CRUD, search, view counts, reactions, stats, audit logs)
     types.ts             # TypeScript interfaces
   pages/
-    api/                 # REST API routes (auth, posts, posts/search, posts/views, projects, statuses, skills, timeline)
+    api/                 # REST API routes (auth, posts, posts/search, posts/views, projects, statuses, skills, timeline, friends, reactions, stats)
     blog/                # Blog list + [slug] detail
     projects/            # Project showcase
     admin/               # Login + admin panel
     skills.astro         # Skills/tech stack
     timeline.astro       # Career timeline
+    archive.astro        # Posts archive by year/month
+    friends.astro        # Blogroll / friend links
     rss.xml.ts           # RSS feed
+    sitemap.xml.ts       # Dynamic sitemap
   lib/
     auth.ts              # Session management, rate limiting, IP extraction
     markdown.ts          # Configured marked renderer (highlight.js + KaTeX + heading IDs + GFM)
