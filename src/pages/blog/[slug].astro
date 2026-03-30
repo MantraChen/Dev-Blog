@@ -48,31 +48,56 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
 
   <div class="max-w-4xl mx-auto py-10 flex gap-10">
     <article class="flex-1 min-w-0">
+
       <header class="mb-10 reveal">
         {post.coverImage && (
-          <img
-            src={post.coverImage}
-            alt={post.title}
-            class="w-full aspect-video rounded-lg object-cover mb-6 border border-border"
-          />
+          <div class="relative w-full aspect-video rounded-lg overflow-hidden mb-6 border border-border">
+            <img
+              src={post.coverImage}
+              alt={post.title}
+              class="absolute inset-0 w-full h-full object-cover"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
+            <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+              <h1 class="text-3xl font-extrabold tracking-tight lg:text-4xl text-foreground drop-shadow-md">{post.title}</h1>
+              <div class="flex items-center gap-4 text-muted-foreground mt-3">
+                <time>
+                  {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                </time>
+                <span>·</span>
+                <span>{readingTime} min read</span>
+                <span>·</span>
+                <span>{viewCount} 次阅读</span>
+              </div>
+              <div class="flex flex-wrap gap-2 mt-3">
+                {post.tags.map((tag) => (
+                  <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-background/70 text-foreground backdrop-blur-sm">{tag}</span>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
-        <h1 class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4">{post.title}</h1>
-        <div class="flex items-center gap-4 text-muted-foreground">
-          <time>
-            {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-          </time>
-          <span>·</span>
-          <span>{readingTime} min read</span>
-          <span>·</span>
-          <span>{viewCount} 次阅读</span>
-        </div>
-
-        <div class="flex flex-wrap gap-2 mt-4">
-          {post.tags.map((tag) => (
-            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">{tag}</span>
-          ))}
-        </div>
+        {!post.coverImage && (
+          <>
+            <h1 class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4">{post.title}</h1>
+            <div class="flex items-center gap-4 text-muted-foreground">
+              <time>
+                {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+              </time>
+              <span>·</span>
+              <span>{readingTime} min read</span>
+              <span>·</span>
+              <span>{viewCount} 次阅读</span>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-4">
+              {post.tags.map((tag) => (
+                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">{tag}</span>
+              ))}
+            </div>
+          </>
+        )}
       </header>
+
       <div class="prose prose-zinc dark:prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:rounded-lg prose-lead:leading-relaxed reveal">
         <Fragment set:html={htmlContent} />
       </div>

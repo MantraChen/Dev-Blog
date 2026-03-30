@@ -61,6 +61,7 @@ function BlogPanel() {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [autoSlug, setAutoSlug] = useState(true);
+  const [coverImage, setCoverImage] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch("/api/posts");
@@ -82,6 +83,7 @@ function BlogPanel() {
     setSlug(post.slug);
     setContent(post.content);
     setAutoSlug(false);
+    setCoverImage(post.coverImage || "");
     setShowForm(true);
     setPreview(false);
   };
@@ -92,6 +94,7 @@ function BlogPanel() {
     setSlug("");
     setContent("");
     setAutoSlug(true);
+    setCoverImage("");
     setShowForm(!showForm);
     setPreview(false);
   };
@@ -108,6 +111,7 @@ function BlogPanel() {
       featured: fd.get("featured") === "on",
       draft: fd.get("draft") === "on",
       publishedAt: (fd.get("publishedAt") as string) || new Date().toISOString(),
+      coverImage: coverImage || null,
     };
 
     if (editing) {
@@ -128,6 +132,7 @@ function BlogPanel() {
     setContent("");
     setTitle("");
     setSlug("");
+    setCoverImage("");
     load();
   };
 
@@ -232,6 +237,32 @@ function BlogPanel() {
               defaultValue={editing?.description || ""}
               className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
             />
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground">Cover Image URL</label>
+            <div className="flex gap-2">
+              <input
+                value={coverImage}
+                onChange={(e) => setCoverImage(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              />
+              {coverImage && (
+                <button
+                  type="button"
+                  onClick={() => setCoverImage("")}
+                  className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10 shrink-0"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {coverImage && (
+              <div className="mt-2 rounded-md overflow-hidden border">
+                <img src={coverImage} alt="Cover preview" className="w-full h-32 object-cover" />
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3">

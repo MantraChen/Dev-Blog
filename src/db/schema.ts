@@ -71,11 +71,35 @@ export const posts = sqliteTable("posts", {
   content: text().notNull().default(""),
   tags: text({ mode: "json" }).notNull().$type<string[]>().default([]),
   featured: int({ mode: "boolean" }).notNull().default(false),
+  series: text(),
   draft: int({ mode: "boolean" }).notNull().default(true),
   publishedAt: text()
     .notNull()
     .default(sql`(datetime('now'))`),
   updatedAt: text(),
+  createdAt: text()
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+// ─── Friends (Blogroll) ──────────────────────────────────────────────
+export const friends = sqliteTable("friends", {
+  id: int().primaryKey({ autoIncrement: true }),
+  name: text().notNull(),
+  url: text().notNull(),
+  avatar: text(),
+  description: text(),
+  sortOrder: int().notNull().default(0),
+  createdAt: text()
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+// ─── Reactions ──────────────────────────────────────────────────────
+export const reactions = sqliteTable("reactions", {
+  id: int().primaryKey({ autoIncrement: true }),
+  slug: text().notNull(),
+  emoji: text().notNull(), // 👍 🎉 ❤️ 🚀 👀 🤔
   createdAt: text()
     .notNull()
     .default(sql`(datetime('now'))`),

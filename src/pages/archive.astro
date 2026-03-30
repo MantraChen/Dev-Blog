@@ -1,0 +1,53 @@
+---
+import BaseLayout from "@/components/layout/BaseLayout.astro"
+import { getPublishedPosts } from "@/db/queries"
+
+const posts = await getPublishedPosts()
+
+// 按年月分组
+const grouped: Record<string, Record<string, typeof posts>> = {}
+posts.forEach(post => {
+  const date = new Date(post.publishedAt)
+  const year = String(date.getFullYear())
+  const month = date.toLocaleDateString('en-US', { month: 'long' })
+  if (!grouped[year]) grouped[year] = {}
+  if (!grouped[year][month]) grouped[year][month] = []
+  grouped[year][month].push(post)
+})
+
+const years = Object.keys(grouped).sort((a, b) => Number(b) - Number(a))
+---
+
+<BaseLayout title="Archive | Tech Blog" description="All posts by date">
+  <div class="max-w-3xl mx-auto py-10">
+    <h1 class="text-3xl font-bold tracking-tight mb-2 reveal">Archive</h1>
+    <p class="text-muted-foreground mb-10 reveal">{posts.length} posts total</p>
+
+    {years.map(year => (
+      <section class="mb-10 reveal">
+        <h2 class="text-2xl font-semibold tracking-tight mb-6 text-foreground">{year}</h2>
+        {Object.entries(grouped[year]).map(([month, monthPosts]) => (
+          <div class="mb-6">
+            <h3 class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">{month}</h3>
+            <ul class="space-y-2">
+              {monthPosts.map(post => (
+                <li class="flex items-baseline gap-4">
+                  <time class="text-xs text-muted-foreground tabular-nums shrink-0 w-12">
+                    {new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </time>
+                  <a href={`/blog/${post.slug}`} class="text-sm hover:text-primary transition-colors truncate">
+                    {post.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+    ))}
+
+    {posts.length === 0 && (
+      <p class="text-muted-foreground text-center py-12">No posts yet.</p>
+    )}
+  </div>
+</BaseLayout>

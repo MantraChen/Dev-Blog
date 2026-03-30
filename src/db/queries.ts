@@ -1,6 +1,6 @@
-import { desc, eq, lt, like, or, count } from "drizzle-orm";
+import { desc, eq, lt, like, or, count, sql } from "drizzle-orm";
 import { db } from ".";
-import { projects, posts, postViews, statuses, skills, timeline, adminSessions, auditLogs } from "./schema";
+import { projects, posts, postViews, statuses, skills, timeline, friends, reactions, adminSessions, auditLogs } from "./schema";
 import type {
   ProjectItem,
   PostItem,
@@ -11,6 +11,7 @@ import type {
   NewPost,
   NewSkill,
   NewTimelineEntry,
+  NewFriend,
   NewAuditLog,
 } from "./types";
 
@@ -144,6 +145,7 @@ export async function getPublishedPosts(): Promise<PostItem[]> {
       coverImage: posts.coverImage,
       content: posts.content,
       tags: posts.tags,
+      series: posts.series,
       featured: posts.featured,
       draft: posts.draft,
       publishedAt: posts.publishedAt,
@@ -164,6 +166,7 @@ export async function getAllPosts(): Promise<PostItem[]> {
       coverImage: posts.coverImage,
       content: posts.content,
       tags: posts.tags,
+      series: posts.series,
       featured: posts.featured,
       draft: posts.draft,
       publishedAt: posts.publishedAt,
@@ -184,6 +187,7 @@ export async function searchPosts(query: string): Promise<PostItem[]> {
       coverImage: posts.coverImage,
       content: posts.content,
       tags: posts.tags,
+      series: posts.series,
       featured: posts.featured,
       draft: posts.draft,
       publishedAt: posts.publishedAt,
@@ -224,6 +228,7 @@ export async function getPostBySlug(slug: string): Promise<PostItem | null> {
       coverImage: posts.coverImage,
       content: posts.content,
       tags: posts.tags,
+      series: posts.series,
       featured: posts.featured,
       draft: posts.draft,
       publishedAt: posts.publishedAt,
@@ -301,4 +306,85 @@ export async function getAuditLogs(limit = 50) {
     .from(auditLogs)
     .orderBy(desc(auditLogs.createdAt))
     .limit(limit);
+}
+
+// ─── Friends (Blogroll) ─────────────────────────────────────────────
+
+export async function getFriendList() {
+  return db
+    .select()
+    .from(friends)
+    .orderBy(friends.sortOrder);
+}
+
+export async function createFriend(data: NewFriend) {
+  return db.insert(friends).values(data).returning();
+}
+
+export async function updateFriend(id: number, data: Partial<NewFriend>) {
+  return db.update(friends).set(data).where(eq(friends.id, id)).returning();
+}
+
+export async function deleteFriend(id: number) {
+  return db.delete(friends).where(eq(friends.id, id));
+}
+
+// ─── Reactions ──────────────────────────────────────────────────────
+
+export async function addReaction(slug: string, emoji: string) {
+  return db.insert(reactions).values({ slug, emoji });
+}
+
+export async function getReactionCounts(slug: string): Promise<Record<string, number>> {
+  const rows = await db
+    .select({ emoji: reactions.emoji, count: count() })
+    .from(reactions)
+    .where(eq(reactions.slug, slug))
+    .groupBy(reactions.emoji);
+  return Object.fromEntries(rows.map((r) => [r.emoji, r.count]));
+}
+
+// ─── Stats ──────────────────────────────────────────────────────────
+
+export async function getTotalViews(): Promise<number> {
+  const rows = await db.select({ count: count() }).from(postViews);
+  return rows[0]?.count ?? 0;
+}
+
+export async function getTopPosts(limit = 10) {
+  const rows = await db
+    .select({ slug: postViews.slug, views: count() })
+    .from(postViews)
+    .groupBy(postViews.slug)
+    .orderBy(desc(count()))
+    .limit(limit);
+  // Enrich with post titles
+  const allPosts = await db
+    .select({ slug: posts.slug, title: posts.title })
+    .from(posts);
+  const titleMap = Object.fromEntries(allPosts.map((p) => [p.slug, p.title]));
+  return rows.map((r) => ({ slug: r.slug, title: titleMap[r.slug] || r.slug, views: r.views }));
+}
+
+export async function getViewsByDay(days = 30) {
+  const rows = await db
+    .select({
+      date: sql<string>`date(${postViews.createdAt})`.as("date"),
+      views: count(),
+    })
+    .from(postViews)
+    .where(sql`${postViews.createdAt} >= datetime('now', '-${sql.raw(String(days))} days')`)
+    .groupBy(sql`date(${postViews.createdAt})`)
+    .orderBy(sql`date(${postViews.createdAt})`);
+  return rows;
+}
+
+// ─── Series ─────────────────────────────────────────────────────────
+
+export async function getPostsBySeries(series: string): Promise<Pick<PostItem, "title" | "slug">[]> {
+  return db
+    .select({ title: posts.title, slug: posts.slug })
+    .from(posts)
+    .where(eq(posts.series, series))
+    .orderBy(posts.publishedAt);
 }

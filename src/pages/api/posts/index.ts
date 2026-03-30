@@ -30,6 +30,7 @@ export const POST: APIRoute = async ({ request }) => {
     slug: body.slug,
     description: body.description ?? "",
     coverImage: body.coverImage ?? null,
+    series: body.series ?? null,
     content: body.content ?? "",
     tags: body.tags ?? [],
     featured: body.featured ?? false,

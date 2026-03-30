@@ -4,6 +4,8 @@ import type {
   statuses,
   skills,
   timeline,
+  friends,
+  reactions,
   adminSessions,
   auditLogs,
 } from "./schema";
@@ -23,6 +25,12 @@ export type NewTimelineEntry = typeof timeline.$inferInsert;
 
 export type Post = typeof posts.$inferSelect;
 export type NewPost = typeof posts.$inferInsert;
+
+export type Friend = typeof friends.$inferSelect;
+export type NewFriend = typeof friends.$inferInsert;
+
+export type Reaction = typeof reactions.$inferSelect;
+export type NewReaction = typeof reactions.$inferInsert;
 
 export type AdminSession = typeof adminSessions.$inferSelect;
 
@@ -71,6 +79,7 @@ export interface PostItem {
   coverImage: string | null;
   content: string;
   tags: string[];
+  series: string | null;
   featured: boolean;
   draft: boolean;
   publishedAt: string;
