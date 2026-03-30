@@ -109,34 +109,27 @@ export function BlogPanel() {
     load();
   };
 
-  // Simple markdown to HTML for preview (basic conversion)
+  // 通过服务端 API 进行精准 Markdown 解析
   const renderPreview = useCallback(async () => {
-    // Use a simple client-side conversion for preview
-    let html = content
-      // Code blocks
-      .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
-      // Headings
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      // Bold / italic
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // Inline code
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      // Links
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-      // Lists
-      .replace(/^- (.+)$/gm, '<li>$1</li>')
-      // Paragraphs
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/^(?!<[hlopu])/gm, '');
-    html = `<p>${html}</p>`.replace(/<p><\/p>/g, '');
-    setPreviewHtml(html);
+    try {
+      const res = await fetch("/api/posts/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error("Preview failed");
+      const { html } = await res.json();
+      setPreviewHtml(html);
+    } catch {
+      setPreviewHtml('<p class="text-destructive">Preview rendering failed</p>');
+    }
   }, [content]);
 
+  // 使用 300ms 的防抖 (debounce) 来避免按键时频繁触发请求
   useEffect(() => {
-    if (preview) renderPreview();
+    if (!preview) return;
+    const timer = setTimeout(() => renderPreview(), 300);
+    return () => clearTimeout(timer);
   }, [preview, content, renderPreview]);
 
   return (
@@ -245,7 +238,6 @@ export function BlogPanel() {
             </label>
           </div>
 
-          {/* Editor with preview toggle */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs text-muted-foreground">Content (Markdown)</label>
