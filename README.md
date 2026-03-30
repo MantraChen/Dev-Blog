@@ -48,7 +48,8 @@ src/
   components/
     layout/              # BaseLayout, Nav
     blog/                # TagFilter with search, ReactionBar (React islands)
-    admin/               # AdminApp (React island, 7 tabs)
+    admin/               # AdminApp (React island, tab router)
+      panels/            # BlogPanel, ProjectsPanel, StatusesPanel, SkillsPanel, TimelinePanel, FriendsPanel, StatsPanel
     ThemeToggle.tsx       # Dark/light mode toggle
   db/
     schema.ts            # Drizzle schema (posts, postViews, projects, statuses, skills, timeline, friends, reactions, adminSessions, auditLogs)
