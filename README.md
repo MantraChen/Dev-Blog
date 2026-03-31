@@ -32,9 +32,16 @@ A personal technical blog built with Astro 6 SSR, showcasing projects in concurr
 - **Stats dashboard**: Total views, top posts ranking, daily views bar chart (last 30 days)
 
 ### Security
+- Security middleware with HTTP security headers (CSP, X-Frame-Options, HSTS, Referrer-Policy, Permissions-Policy)
+- Input validation on all API routes via Zod schemas
 - Login rate limiting (5 attempts per 15 minutes per IP)
-- Audit logging on all admin operations (create/update/delete + login events)
-- HttpOnly session cookies with 7-day expiry
+- Public API rate limiting (60 requests per minute per IP)
+- Request body size limit (1MB)
+- Audit logging on all admin operations (create/update/delete + login/logout events)
+- Secure HttpOnly session cookies with SameSite=Strict and 7-day expiry
+- Markdown raw HTML sanitization to prevent XSS
+- Strict ID parameter parsing on all API routes
+- Cache-Control: no-store on all authenticated API responses
 
 ### Performance & SEO
 - SSR cache headers on all public pages (Cache-Control + stale-while-revalidate)
@@ -68,8 +75,10 @@ src/
     sitemap.xml.ts       # Dynamic sitemap
   lib/
     auth.ts              # Session management, rate limiting, IP extraction
-    markdown.ts          # Configured marked renderer (highlight.js + KaTeX + heading IDs + GFM)
+    markdown.ts          # Configured marked renderer (highlight.js + KaTeX + heading IDs + GFM + HTML sanitization)
+    validation.ts        # Zod schemas for API input validation + safe body parser
     utils.ts             # cn() helper
+  middleware.ts          # Security headers, public API rate limiting, body size limit
   styles/globals.css     # Tailwind + CSS custom properties
 ```
 
