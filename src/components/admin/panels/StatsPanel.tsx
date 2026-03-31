@@ -10,7 +10,29 @@ export function StatsPanel() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (!stats) return <div className="text-sm text-muted-foreground">Loading stats...</div>;
+  if (!stats) return (
+    <div className="space-y-6">
+      <div className="border rounded-lg p-6 space-y-2">
+        <div className="h-3 bg-muted rounded animate-pulse w-20" />
+        <div className="h-8 bg-muted rounded animate-pulse w-16" />
+      </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="border rounded-lg p-4 space-y-3">
+          <div className="h-4 bg-muted rounded animate-pulse w-24" />
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex gap-4 items-center">
+              <div className="h-4 bg-muted rounded animate-pulse flex-1" />
+              <div className="h-4 bg-muted rounded animate-pulse w-12" />
+            </div>
+          ))}
+        </div>
+        <div className="border rounded-lg p-4 space-y-3">
+          <div className="h-4 bg-muted rounded animate-pulse w-32" />
+          <div className="h-[120px] bg-muted rounded animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
 
   const maxViews = Math.max(...(stats.dailyViews?.map((d: any) => d.views) || [0]), 1);
 

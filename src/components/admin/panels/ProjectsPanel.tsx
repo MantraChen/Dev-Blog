@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 
 export function ProjectsPanel() {
+  const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/projects");
-    setItems(await res.json());
+    try {
+      const res = await fetch("/api/projects");
+      if (res.ok) setItems(await res.json());
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -24,28 +30,31 @@ export function ProjectsPanel() {
       sortOrder: Number(fd.get("sortOrder")) || 0,
     };
 
-    if (editing) {
-      await fetch(`/api/projects/${editing.id}`, {
-        method: "PUT",
+    try {
+      const res = await fetch(editing ? `/api/projects/${editing.id}` : "/api/projects", {
+        method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-    } else {
-      await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      if (!res.ok) throw new Error();
+      toast.success(editing ? "Project updated successfully" : "Project created successfully");
+      setEditing(null);
+      setShowForm(false);
+      load();
+    } catch {
+      toast.error("Failed to save project");
     }
-    setEditing(null);
-    setShowForm(false);
-    load();
   };
 
   const remove = async (id: number) => {
     if (!confirm("Delete this project?")) return;
-    await fetch(`/api/projects/${id}`, { method: "DELETE" });
-    load();
+    try {
+      await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      toast.success("Project deleted");
+      load();
+    } catch {
+      toast.error("Failed to delete project");
+    }
   };
 
   return (
@@ -74,27 +83,39 @@ export function ProjectsPanel() {
         </form>
       )}
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2 font-medium">Name</th>
-            <th className="text-left py-2 font-medium">Description</th>
-            <th className="text-right py-2 font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((p) => (
-            <tr key={p.id} className="border-b">
-              <td className="py-2 font-medium">{p.name}</td>
-              <td className="py-2 text-muted-foreground truncate max-w-[200px]">{p.description}</td>
-              <td className="py-2 text-right space-x-2">
-                <button onClick={() => { setEditing(p); setShowForm(true); }} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
-                <button onClick={() => remove(p.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>
-              </td>
-            </tr>
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex gap-4 items-center">
+              <div className="h-4 bg-muted rounded animate-pulse flex-1" />
+              <div className="h-4 bg-muted rounded animate-pulse w-24" />
+              <div className="h-4 bg-muted rounded animate-pulse w-16" />
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-2 font-medium">Name</th>
+              <th className="text-left py-2 font-medium">Description</th>
+              <th className="text-right py-2 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((p) => (
+              <tr key={p.id} className="border-b">
+                <td className="py-2 font-medium">{p.name}</td>
+                <td className="py-2 text-muted-foreground truncate max-w-[200px]">{p.description}</td>
+                <td className="py-2 text-right space-x-2">
+                  <button onClick={() => { setEditing(p); setShowForm(true); }} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
+                  <button onClick={() => remove(p.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 
 export function TimelinePanel() {
+  const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/timeline");
-    setItems(await res.json());
+    try {
+      const res = await fetch("/api/timeline");
+      if (res.ok) setItems(await res.json());
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -25,28 +31,31 @@ export function TimelinePanel() {
       sortOrder: Number(fd.get("sortOrder")) || 0,
     };
 
-    if (editing) {
-      await fetch(`/api/timeline/${editing.id}`, {
-        method: "PUT",
+    try {
+      const res = await fetch(editing ? `/api/timeline/${editing.id}` : "/api/timeline", {
+        method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-    } else {
-      await fetch("/api/timeline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      if (!res.ok) throw new Error();
+      toast.success(editing ? "Entry updated successfully" : "Entry created successfully");
+      setEditing(null);
+      setShowForm(false);
+      load();
+    } catch {
+      toast.error("Failed to save entry");
     }
-    setEditing(null);
-    setShowForm(false);
-    load();
   };
 
   const remove = async (id: number) => {
     if (!confirm("Delete this entry?")) return;
-    await fetch(`/api/timeline/${id}`, { method: "DELETE" });
-    load();
+    try {
+      await fetch(`/api/timeline/${id}`, { method: "DELETE" });
+      toast.success("Entry deleted");
+      load();
+    } catch {
+      toast.error("Failed to delete entry");
+    }
   };
 
   return (
@@ -83,29 +92,41 @@ export function TimelinePanel() {
         </form>
       )}
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2 font-medium">Title</th>
-            <th className="text-left py-2 font-medium">Type</th>
-            <th className="text-left py-2 font-medium">Date</th>
-            <th className="text-right py-2 font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((t) => (
-            <tr key={t.id} className="border-b">
-              <td className="py-2 font-medium">{t.title}</td>
-              <td className="py-2 text-muted-foreground">{t.type}</td>
-              <td className="py-2 text-muted-foreground">{t.date}</td>
-              <td className="py-2 text-right space-x-2">
-                <button onClick={() => { setEditing(t); setShowForm(true); }} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
-                <button onClick={() => remove(t.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>
-              </td>
-            </tr>
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex gap-4 items-center">
+              <div className="h-4 bg-muted rounded animate-pulse flex-1" />
+              <div className="h-4 bg-muted rounded animate-pulse w-24" />
+              <div className="h-4 bg-muted rounded animate-pulse w-16" />
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-2 font-medium">Title</th>
+              <th className="text-left py-2 font-medium">Type</th>
+              <th className="text-left py-2 font-medium">Date</th>
+              <th className="text-right py-2 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((t) => (
+              <tr key={t.id} className="border-b">
+                <td className="py-2 font-medium">{t.title}</td>
+                <td className="py-2 text-muted-foreground">{t.type}</td>
+                <td className="py-2 text-muted-foreground">{t.date}</td>
+                <td className="py-2 text-right space-x-2">
+                  <button onClick={() => { setEditing(t); setShowForm(true); }} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
+                  <button onClick={() => remove(t.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Toaster } from "sonner";
 import { BlogPanel } from "./panels/BlogPanel";
 import { ProjectsPanel } from "./panels/ProjectsPanel";
 import { StatusesPanel } from "./panels/StatusesPanel";
@@ -24,6 +25,7 @@ export function AdminApp() {
 
   return (
     <div>
+      <Toaster position="top-right" richColors />
       <div className="flex border-b mb-6 overflow-x-auto">
         {tabs.map((tab) => (
           <button

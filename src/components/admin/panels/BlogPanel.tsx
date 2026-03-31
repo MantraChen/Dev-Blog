@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 
 function slugify(text: string): string {
   return text
@@ -10,6 +11,7 @@ function slugify(text: string): string {
 }
 
 export function BlogPanel() {
+  const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -22,8 +24,15 @@ export function BlogPanel() {
   const [coverImage, setCoverImage] = useState("");
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/posts");
-    if (res.ok) setItems(await res.json());
+    try {
+      const res = await fetch("/api/posts");
+      if (res.ok) setItems(await res.json());
+      else toast.error("Failed to fetch posts");
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -72,41 +81,51 @@ export function BlogPanel() {
       coverImage: coverImage || null,
     };
 
-    if (editing) {
-      await fetch(`/api/posts/${editing.id}`, {
-        method: "PUT",
+    try {
+      const res = await fetch(editing ? `/api/posts/${editing.id}` : "/api/posts", {
+        method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-    } else {
-      await fetch("/api/posts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      if (!res.ok) throw new Error();
+      toast.success(editing ? "Post updated successfully" : "Post created successfully");
+      setEditing(null);
+      setShowForm(false);
+      setContent("");
+      setTitle("");
+      setSlug("");
+      setCoverImage("");
+      load();
+    } catch {
+      toast.error(editing ? "Failed to update post" : "Failed to create post");
     }
-    setEditing(null);
-    setShowForm(false);
-    setContent("");
-    setTitle("");
-    setSlug("");
-    setCoverImage("");
-    load();
   };
 
   const remove = async (id: number) => {
     if (!confirm("Delete this post?")) return;
-    await fetch(`/api/posts/${id}`, { method: "DELETE" });
-    load();
+    try {
+      const res = await fetch(`/api/posts/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast.success("Post deleted");
+      load();
+    } catch {
+      toast.error("Failed to delete post");
+    }
   };
 
   const toggleDraft = async (post: any) => {
-    await fetch(`/api/posts/${post.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ draft: !post.draft }),
-    });
-    load();
+    try {
+      const res = await fetch(`/api/posts/${post.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draft: !post.draft }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(post.draft ? "Post published" : "Post moved to drafts");
+      load();
+    } catch {
+      toast.error("Failed to update status");
+    }
   };
 
   // 通过服务端 API 进行精准 Markdown 解析
@@ -267,46 +286,58 @@ export function BlogPanel() {
         </form>
       )}
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2 font-medium">Title</th>
-            <th className="text-left py-2 font-medium">Slug</th>
-            <th className="text-left py-2 font-medium">Status</th>
-            <th className="text-left py-2 font-medium">Date</th>
-            <th className="text-right py-2 font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((p) => (
-            <tr key={p.id} className="border-b">
-              <td className="py-2 font-medium">{p.title}</td>
-              <td className="py-2 text-muted-foreground font-mono text-xs">{p.slug}</td>
-              <td className="py-2">
-                <button
-                  onClick={() => toggleDraft(p)}
-                  className={`text-xs px-2 py-0.5 rounded-full ${
-                    p.draft
-                      ? "bg-amber-500/10 text-amber-500 border border-amber-500/30"
-                      : "bg-green-500/10 text-green-500 border border-green-500/30"
-                  }`}
-                >
-                  {p.draft ? "Draft" : "Published"}
-                </button>
-              </td>
-              <td className="py-2 text-muted-foreground text-xs">{p.publishedAt?.split("T")[0]}</td>
-              <td className="py-2 text-right space-x-2">
-                {!p.draft && (
-                  <a href={`/blog/${p.slug}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 rounded border hover:bg-accent inline-block">View</a>
-                )}
-                <button onClick={() => startEdit(p)} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
-                <button onClick={() => remove(p.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>
-              </td>
-            </tr>
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex gap-4 items-center">
+              <div className="h-4 bg-muted rounded animate-pulse flex-1" />
+              <div className="h-4 bg-muted rounded animate-pulse w-24" />
+              <div className="h-4 bg-muted rounded animate-pulse w-16" />
+            </div>
           ))}
-        </tbody>
-      </table>
-      {items.length === 0 && (
+        </div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-2 font-medium">Title</th>
+              <th className="text-left py-2 font-medium">Slug</th>
+              <th className="text-left py-2 font-medium">Status</th>
+              <th className="text-left py-2 font-medium">Date</th>
+              <th className="text-right py-2 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((p) => (
+              <tr key={p.id} className="border-b">
+                <td className="py-2 font-medium">{p.title}</td>
+                <td className="py-2 text-muted-foreground font-mono text-xs">{p.slug}</td>
+                <td className="py-2">
+                  <button
+                    onClick={() => toggleDraft(p)}
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      p.draft
+                        ? "bg-amber-500/10 text-amber-500 border border-amber-500/30"
+                        : "bg-green-500/10 text-green-500 border border-green-500/30"
+                    }`}
+                  >
+                    {p.draft ? "Draft" : "Published"}
+                  </button>
+                </td>
+                <td className="py-2 text-muted-foreground text-xs">{p.publishedAt?.split("T")[0]}</td>
+                <td className="py-2 text-right space-x-2">
+                  {!p.draft && (
+                    <a href={`/blog/${p.slug}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 rounded border hover:bg-accent inline-block">View</a>
+                  )}
+                  <button onClick={() => startEdit(p)} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
+                  <button onClick={() => remove(p.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {!isLoading && items.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-8">No posts yet. Create your first one above.</p>
       )}
     </div>

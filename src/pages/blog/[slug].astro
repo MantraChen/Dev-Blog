@@ -178,7 +178,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         </svg>
       </button>
 
-      <div id="toc-overlay" class="fixed inset-0 bg-black/50 z-40 hidden opacity-0 transition-opacity duration-300 lg:hidden"></div>
+      <div id="toc-overlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden opacity-0 transition-opacity duration-300 lg:hidden"></div>
 
       <div id="toc-drawer" class="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border rounded-t-xl max-h-[60vh] flex flex-col translate-y-full transition-transform duration-300 ease-out lg:hidden">
         <div class="flex items-center justify-between p-4 border-b border-border shrink-0">
@@ -270,11 +270,13 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         void overlay.offsetWidth;
         overlay.classList.remove('opacity-0');
         drawer.classList.remove('translate-y-full');
+        document.body.style.overflow = 'hidden';
       };
 
       const closeDrawer = () => {
         drawer.classList.add('translate-y-full');
         overlay.classList.add('opacity-0');
+        document.body.style.overflow = '';
         setTimeout(() => {
           overlay.classList.add('hidden');
         }, 300);
