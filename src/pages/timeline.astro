@@ -88,65 +88,72 @@ const statsString = [
       </div>
     </header>
 
-    <div class="relative pl-8 md:pl-12">
-      <div class="absolute left-0 top-3 bottom-0 w-1 bg-gradient-to-b from-primary/60 via-primary/20 to-transparent rounded-full"></div>
-
-      <div class="space-y-16">
-        {sortedYears.map((year) => (
-          <div class="relative reveal">
-            <div class="flex items-center mb-8 relative">
-              <div class="absolute -left-[38px] md:-left-[54px] h-5 w-5 rounded-full bg-background border-[4px] border-primary shadow-sm z-10"></div>
-              <h2 class="text-2xl font-bold text-foreground bg-background pr-4">{year}</h2>
-              <div class="h-px bg-border flex-1 ml-2"></div>
+    <div class="space-y-12">
+      {sortedYears.map((year) => (
+        <div class="reveal">
+          <!-- Year header -->
+          <div class="grid grid-cols-[40px_1fr] md:grid-cols-[56px_1fr] gap-4 items-center mb-6">
+            <div class="flex justify-center">
+              <div class="h-5 w-5 rounded-full bg-background border-[4px] border-primary shadow-sm"></div>
             </div>
-
-            <div class="space-y-8">
-              {groupedTimeline[year].map((item) => {
-                const config = typeConfig[item.type] || { icon: defaultIcon, label: item.type, bg: "bg-muted/50 text-foreground", border: "border-border" };
-                return (
-                  <div class="relative group reveal">
-                    <div class={`absolute -left-[50px] md:-left-[66px] top-2 h-10 w-10 rounded-full flex items-center justify-center shadow-sm border ${config.bg} ${config.border} bg-background z-10 transition-transform group-hover:scale-110 duration-300`}>
-                      <Fragment set:html={config.icon} />
-                    </div>
-
-                    <div class="bg-card/50 backdrop-blur-sm border border-border rounded-xl p-5 md:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:bg-card hover:border-primary/30">
-                      <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                        <span class={`text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-md border ${config.bg} ${config.border} font-bold`}>
-                          {config.label}
-                        </span>
-                        <time class="text-sm font-medium text-muted-foreground font-mono">{item.date}</time>
-                      </div>
-
-                      <h3 class="text-xl font-bold mb-2">
-                        {item.url ? (
-                          <a href={item.url} target="_blank" rel="noreferrer" class="hover:text-primary transition-colors hover:underline decoration-primary/50 underline-offset-4">
-                            {item.title}
-                            <span class="inline-block ml-1 opacity-50 text-sm">↗</span>
-                          </a>
-                        ) : (
-                          item.title
-                        )}
-                      </h3>
-
-                      <div class="prose prose-sm prose-zinc dark:prose-invert text-muted-foreground/90 max-w-none leading-relaxed">
-                        {item.description}
-                      </div>
-
-                      {item.tags && item.tags.length > 0 && (
-                        <div class="flex flex-wrap gap-2 mt-5 pt-4 border-t border-border/50">
-                          {item.tags.map((tag: string) => (
-                            <span class="text-xs font-medium text-muted-foreground bg-muted/80 px-2 py-1 rounded-md hover:bg-muted transition-colors">#{tag}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+            <div class="flex items-center gap-3">
+              <h2 class="text-2xl font-bold text-foreground">{year}</h2>
+              <div class="h-px bg-border flex-1"></div>
             </div>
           </div>
-        ))}
-      </div>
+
+          <!-- Items -->
+          <div class="space-y-6">
+            {groupedTimeline[year].map((item) => {
+              const config = typeConfig[item.type] || { icon: defaultIcon, label: item.type, bg: "bg-muted/50 text-foreground", border: "border-border" };
+              return (
+                <div class="grid grid-cols-[40px_1fr] md:grid-cols-[56px_1fr] gap-4 group reveal">
+                  <!-- Rail: line + icon -->
+                  <div class="flex flex-col items-center">
+                    <div class={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-sm border ${config.bg} ${config.border} bg-background z-10 transition-transform group-hover:scale-110 duration-300`}>
+                      <Fragment set:html={config.icon} />
+                    </div>
+                    <div class="w-0.5 flex-1 bg-border/40 mt-2"></div>
+                  </div>
+
+                  <!-- Card -->
+                  <div class="bg-card/50 backdrop-blur-sm border border-border rounded-xl p-5 md:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:bg-card hover:border-primary/30 mb-2">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                      <span class={`text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-md border ${config.bg} ${config.border} font-bold`}>
+                        {config.label}
+                      </span>
+                      <time class="text-sm font-medium text-muted-foreground font-mono">{item.date}</time>
+                    </div>
+
+                    <h3 class="text-xl font-bold mb-2">
+                      {item.url ? (
+                        <a href={item.url} target="_blank" rel="noreferrer" class="hover:text-primary transition-colors hover:underline decoration-primary/50 underline-offset-4">
+                          {item.title}
+                          <span class="inline-block ml-1 opacity-50 text-sm">↗</span>
+                        </a>
+                      ) : (
+                        item.title
+                      )}
+                    </h3>
+
+                    <div class="prose prose-sm prose-zinc dark:prose-invert text-muted-foreground/90 max-w-none leading-relaxed">
+                      {item.description}
+                    </div>
+
+                    {item.tags && item.tags.length > 0 && (
+                      <div class="flex flex-wrap gap-2 mt-5 pt-4 border-t border-border/50">
+                        {item.tags.map((tag: string) => (
+                          <span class="text-xs font-medium text-muted-foreground bg-muted/80 px-2 py-1 rounded-md hover:bg-muted transition-colors">#{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   </div>
 </BaseLayout>
