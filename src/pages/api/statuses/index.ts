@@ -1,9 +1,13 @@
 import type { APIRoute } from "astro";
 import { validateSession, getClientIp } from "@/lib/auth";
 import { getLatestStatuses, createStatus, createAuditLog } from "@/db/queries";
+import { createStatusSchema, safeParseBody } from "@/lib/validation";
 
 export const GET: APIRoute = async ({ url }) => {
-  const limit = Number(url.searchParams.get("limit")) || 20;
+  const limitParam = Number(url.searchParams.get("limit"));
+  const limit = Number.isInteger(limitParam) && limitParam > 0 && limitParam <= 100
+    ? limitParam
+    : 20;
   const statuses = await getLatestStatuses(limit);
   return new Response(JSON.stringify(statuses), {
     headers: { "Content-Type": "application/json" },
@@ -18,14 +22,20 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const body = await request.json();
-  const result = await createStatus(body.text);
+  const parsed = await safeParseBody(request, createStatusSchema);
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: parsed.error }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const result = await createStatus(parsed.data.text);
 
   await createAuditLog({
     action: "status.create",
     resource: "status",
     resourceId: String(result[0].id),
-    detail: body.text,
     ip: getClientIp(request),
   });
 

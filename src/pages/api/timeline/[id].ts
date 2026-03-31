@@ -1,29 +1,48 @@
 import type { APIRoute } from "astro";
 import { validateSession, getClientIp } from "@/lib/auth";
 import { updateTimelineEntry, deleteTimelineEntry, createAuditLog } from "@/db/queries";
+import { updateTimelineSchema, parseId, safeParseBody } from "@/lib/validation";
+
+const AUTH_HEADERS = {
+  "Content-Type": "application/json",
+  "Cache-Control": "no-store, no-cache, must-revalidate, private",
+};
 
 export const PUT: APIRoute = async ({ params, request }) => {
   if (!(await validateSession(request.headers.get("cookie")))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: AUTH_HEADERS,
     });
   }
 
-  const id = Number(params.id);
-  const body = await request.json();
-  const result = await updateTimelineEntry(id, body);
+  const id = parseId(params.id);
+  if (!id) {
+    return new Response(JSON.stringify({ error: "Invalid ID" }), {
+      status: 400,
+      headers: AUTH_HEADERS,
+    });
+  }
+
+  const parsed = await safeParseBody(request, updateTimelineSchema);
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: parsed.error }), {
+      status: 400,
+      headers: AUTH_HEADERS,
+    });
+  }
+
+  const result = await updateTimelineEntry(id, parsed.data);
 
   await createAuditLog({
     action: "timeline.update",
     resource: "timeline",
     resourceId: String(id),
-    detail: body.title,
     ip: getClientIp(request),
   });
 
   return new Response(JSON.stringify(result[0] ?? null), {
-    headers: { "Content-Type": "application/json" },
+    headers: AUTH_HEADERS,
   });
 };
 
@@ -31,11 +50,18 @@ export const DELETE: APIRoute = async ({ params, request }) => {
   if (!(await validateSession(request.headers.get("cookie")))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: AUTH_HEADERS,
     });
   }
 
-  const id = Number(params.id);
+  const id = parseId(params.id);
+  if (!id) {
+    return new Response(JSON.stringify({ error: "Invalid ID" }), {
+      status: 400,
+      headers: AUTH_HEADERS,
+    });
+  }
+
   await deleteTimelineEntry(id);
 
   await createAuditLog({
@@ -46,6 +72,6 @@ export const DELETE: APIRoute = async ({ params, request }) => {
   });
 
   return new Response(JSON.stringify({ ok: true }), {
-    headers: { "Content-Type": "application/json" },
+    headers: AUTH_HEADERS,
   });
 };

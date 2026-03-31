@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { validateSession, getClientIp } from "@/lib/auth";
 import { getProjectList, createProject, createAuditLog } from "@/db/queries";
+import { createProjectSchema, safeParseBody } from "@/lib/validation";
 
 export const GET: APIRoute = async () => {
   const projects = await getProjectList();
@@ -17,21 +18,20 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const body = await request.json();
-  const result = await createProject({
-    name: body.name,
-    description: body.description,
-    techStack: body.techStack ?? [],
-    demoUrl: body.demoUrl ?? null,
-    repoUrl: body.repoUrl ?? null,
-    sortOrder: body.sortOrder ?? 0,
-  });
+  const parsed = await safeParseBody(request, createProjectSchema);
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: parsed.error }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const result = await createProject(parsed.data);
 
   await createAuditLog({
     action: "project.create",
     resource: "project",
     resourceId: String(result[0].id),
-    detail: body.name,
     ip: getClientIp(request),
   });
 

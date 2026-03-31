@@ -21,6 +21,16 @@ renderer.heading = ({ tokens, depth }) => {
   return `<h${depth} id="${id}">${text}</h${depth}>\n`;
 };
 
+// Sanitize raw HTML blocks — prevent XSS via markdown injection
+renderer.html = ({ text }) => {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
 // Code syntax highlighting
 marked.use(
   markedHighlight({

@@ -80,11 +80,11 @@ export async function logout(cookieHeader: string | null): Promise<void> {
 
 export function makeSessionCookie(sessionId: string): string {
   const expires = new Date(Date.now() + SESSION_DURATION_MS).toUTCString();
-  return `${SESSION_COOKIE}=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`;
+  return `${SESSION_COOKIE}=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Strict; Expires=${expires}`;
 }
 
 export function clearSessionCookie(): string {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }
 
 function parseCookie(header: string, name: string): string | null {

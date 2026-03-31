@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { validateSession, getClientIp } from "@/lib/auth";
 import { getFriendList, createFriend, createAuditLog } from "@/db/queries";
+import { createFriendSchema, safeParseBody } from "@/lib/validation";
 
 export const GET: APIRoute = async () => {
   const friends = await getFriendList();
@@ -17,20 +18,20 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const body = await request.json();
-  const result = await createFriend({
-    name: body.name,
-    url: body.url,
-    avatar: body.avatar || null,
-    description: body.description || null,
-    sortOrder: body.sortOrder ?? 0,
-  });
+  const parsed = await safeParseBody(request, createFriendSchema);
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: parsed.error }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const result = await createFriend(parsed.data);
 
   await createAuditLog({
     action: "friend.create",
     resource: "friend",
     resourceId: String(result[0].id),
-    detail: body.name,
     ip: getClientIp(request),
   });
 

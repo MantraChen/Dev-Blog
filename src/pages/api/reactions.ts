@@ -1,11 +1,10 @@
 import type { APIRoute } from "astro";
 import { addReaction, getReactionCounts } from "@/db/queries";
-
-const ALLOWED_EMOJIS = ["👍", "🎉", "❤️", "🚀", "👀", "🤔"];
+import { reactionSchema, safeParseBody } from "@/lib/validation";
 
 export const GET: APIRoute = async ({ url }) => {
   const slug = url.searchParams.get("slug");
-  if (!slug) {
+  if (!slug || slug.length > 200) {
     return new Response(JSON.stringify({ error: "Missing slug" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -19,18 +18,16 @@ export const GET: APIRoute = async ({ url }) => {
 };
 
 export const POST: APIRoute = async ({ request }) => {
-  const body = await request.json();
-  const { slug, emoji } = body;
-
-  if (!slug || !emoji || !ALLOWED_EMOJIS.includes(emoji)) {
-    return new Response(JSON.stringify({ error: "Invalid slug or emoji" }), {
+  const parsed = await safeParseBody(request, reactionSchema);
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: parsed.error }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  await addReaction(slug, emoji);
-  const counts = await getReactionCounts(slug);
+  await addReaction(parsed.data.slug, parsed.data.emoji);
+  const counts = await getReactionCounts(parsed.data.slug);
 
   return new Response(JSON.stringify(counts), {
     status: 201,

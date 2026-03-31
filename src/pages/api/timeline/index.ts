@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { validateSession, getClientIp } from "@/lib/auth";
 import { getTimelineList, createTimelineEntry, createAuditLog } from "@/db/queries";
+import { createTimelineSchema, safeParseBody } from "@/lib/validation";
 
 export const GET: APIRoute = async () => {
   const entries = await getTimelineList();
@@ -17,22 +18,20 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const body = await request.json();
-  const result = await createTimelineEntry({
-    title: body.title,
-    description: body.description,
-    type: body.type,
-    date: body.date,
-    tags: body.tags ?? null,
-    url: body.url ?? null,
-    sortOrder: body.sortOrder ?? 0,
-  });
+  const parsed = await safeParseBody(request, createTimelineSchema);
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: parsed.error }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const result = await createTimelineEntry(parsed.data);
 
   await createAuditLog({
     action: "timeline.create",
     resource: "timeline",
     resourceId: String(result[0].id),
-    detail: body.title,
     ip: getClientIp(request),
   });
 
