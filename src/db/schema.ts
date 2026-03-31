@@ -42,7 +42,7 @@ export const timeline = sqliteTable("timeline", {
   id: int().primaryKey({ autoIncrement: true }),
   title: text().notNull(),
   description: text().notNull(),
-  type: text().notNull(), // career, education, milestone, learning
+  type: text().notNull(), // career, education, milestone, learning, project-completed, project-in-progress, project-abandoned
   date: text().notNull(), // ISO date string
   tags: text({ mode: "json" }).$type<string[]>(),
   url: text(),

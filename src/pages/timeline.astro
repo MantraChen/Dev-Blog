@@ -2,64 +2,151 @@
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getTimelineList } from "@/db/queries"
 
-const timelineItems = await getTimelineList()
+const timeline = await getTimelineList()
 
-const typeStyles: Record<string, string> = {
-  career: "border-blue-500 bg-blue-500/10",
-  education: "border-purple-500 bg-purple-500/10",
-  milestone: "border-amber-500 bg-amber-500/10",
-  learning: "border-green-500 bg-green-500/10",
+Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=3600')
+
+// 按年份分组
+const groupedTimeline = timeline.reduce((acc, item) => {
+  const year = item.date.substring(0, 4)
+  if (!acc[year]) acc[year] = []
+  acc[year].push(item)
+  return acc
+}, {} as Record<string, typeof timeline>)
+
+const sortedYears = Object.keys(groupedTimeline).sort((a, b) => Number(b) - Number(a))
+
+// 统计条目数量
+const stats = timeline.reduce((acc, item) => {
+  acc[item.type] = (acc[item.type] || 0) + 1;
+  return acc;
+}, {} as Record<string, number>);
+
+// SVG 生成辅助函数 (Lucide icons)
+const getIcon = (paths: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+
+// 类型与颜色、图标配置
+const typeConfig: Record<string, { bg: string, border: string, icon: string, label: string }> = {
+  career: {
+    bg: "bg-blue-500/10 text-blue-600 dark:text-blue-400", border: "border-blue-500/30",
+    icon: getIcon('<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>'),
+    label: "Career"
+  },
+  education: {
+    bg: "bg-purple-500/10 text-purple-600 dark:text-purple-400", border: "border-purple-500/30",
+    icon: getIcon('<path d="M21.42 10.922a2 2 0 0 0-.019-3.838L12.83 4.34a2 2 0 0 0-1.66 0l-8.57 2.744a2 2 0 0 0-.019 3.838l8.57 2.744a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>'),
+    label: "Education"
+  },
+  milestone: {
+    bg: "bg-amber-500/10 text-amber-600 dark:text-amber-400", border: "border-amber-500/30",
+    icon: getIcon('<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 1.1-.9 2-2 2H6"/><path d="M14 14.66V17c0 1.1.9 2 2 2h2"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>'),
+    label: "Milestone"
+  },
+  learning: {
+    bg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/30",
+    icon: getIcon('<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>'),
+    label: "Learning"
+  },
+  "project-completed": {
+    bg: "bg-teal-500/10 text-teal-600 dark:text-teal-400", border: "border-teal-500/30",
+    icon: getIcon('<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>'),
+    label: "Project Completed"
+  },
+  "project-in-progress": {
+    bg: "bg-orange-500/10 text-orange-600 dark:text-orange-400", border: "border-orange-500/30",
+    icon: getIcon('<path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/>'),
+    label: "In Progress"
+  },
+  "project-abandoned": {
+    bg: "bg-rose-500/10 text-rose-600 dark:text-rose-400", border: "border-rose-500/30",
+    icon: getIcon('<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>'),
+    label: "Abandoned"
+  },
 }
 
-Astro.response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400')
+// 默认兜底图标 (Circle)
+const defaultIcon = getIcon('<circle cx="12" cy="12" r="10"/>');
 
-const typeLabels: Record<string, string> = {
-  career: "Career",
-  education: "Education",
-  milestone: "Milestone",
-  learning: "Learning",
-}
+// 生成统计文本
+const statsString = [
+  `${timeline.length} entries`,
+  ...Object.entries(stats).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
+    const label = typeConfig[type]?.label || type;
+    return `${count} ${label.toLowerCase()}`
+  })
+].join(' · ')
 ---
 
-<BaseLayout title="Timeline | Tech Blog" description="Career and learning timeline">
-  <div class="max-w-2xl mx-auto py-10">
-    <h1 class="text-3xl font-bold tracking-tight mb-8 reveal">Timeline</h1>
-    {timelineItems.length === 0 && (
-      <p class="text-muted-foreground text-center py-12">No timeline entries yet.</p>
-    )}
-    <div class="relative border-l border-muted ml-3 space-y-8">
-      {timelineItems.map((item) => (
-        <div class="relative pl-8 reveal">
-          <div class={`absolute -left-3 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${typeStyles[item.type] || "border-muted bg-muted/10"}`}>
-            {item.type.charAt(0).toUpperCase()}
-          </div>
-          <div class="flex flex-col gap-1">
-            <div class="flex items-center gap-2">
-              <time class="text-sm text-muted-foreground">{new Date(item.date).toLocaleDateString()}</time>
-              <span class={`text-xs px-2 py-0.5 rounded-full border ${typeStyles[item.type] || ""}`}>
-                {typeLabels[item.type] || item.type}
-              </span>
+<BaseLayout title="Timeline | Blog" description="My journey, milestones, and learning path.">
+  <div class="max-w-3xl mx-auto py-12 px-4 sm:px-6">
+    <header class="mb-16 reveal">
+      <h1 class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4">Timeline</h1>
+      <p class="text-lg text-muted-foreground mb-4">My journey, milestones, and learning path.</p>
+      <div class="text-sm font-medium text-muted-foreground bg-muted/50 inline-block px-4 py-1.5 rounded-full">
+        {statsString}
+      </div>
+    </header>
+
+    <div class="relative pl-8 md:pl-12">
+      <div class="absolute left-0 top-3 bottom-0 w-1 bg-gradient-to-b from-primary/60 via-primary/20 to-transparent rounded-full"></div>
+
+      <div class="space-y-16">
+        {sortedYears.map((year) => (
+          <div class="relative reveal">
+            <div class="flex items-center mb-8 relative">
+              <div class="absolute -left-[38px] md:-left-[54px] h-5 w-5 rounded-full bg-background border-[4px] border-primary shadow-sm z-10"></div>
+              <h2 class="text-2xl font-bold text-foreground bg-background pr-4">{year}</h2>
+              <div class="h-px bg-border flex-1 ml-2"></div>
             </div>
-            <h3 class="text-lg font-semibold">
-              {item.url ? (
-                <a href={item.url} target="_blank" rel="noopener noreferrer" class="hover:underline">
-                  {item.title}
-                </a>
-              ) : (
-                item.title
-              )}
-            </h3>
-            <p class="text-muted-foreground">{item.description}</p>
-            {item.tags && item.tags.length > 0 && (
-              <div class="flex flex-wrap gap-2 mt-2">
-                {item.tags.map((tag) => (
-                  <span class="text-xs border px-2 py-0.5 rounded-full bg-secondary/50">{tag}</span>
-                ))}
-              </div>
-            )}
+
+            <div class="space-y-8">
+              {groupedTimeline[year].map((item) => {
+                const config = typeConfig[item.type] || { icon: defaultIcon, label: item.type, bg: "bg-muted/50 text-foreground", border: "border-border" };
+                return (
+                  <div class="relative group reveal">
+                    <div class={`absolute -left-[50px] md:-left-[66px] top-2 h-10 w-10 rounded-full flex items-center justify-center shadow-sm border ${config.bg} ${config.border} bg-background z-10 transition-transform group-hover:scale-110 duration-300`}>
+                      <Fragment set:html={config.icon} />
+                    </div>
+
+                    <div class="bg-card/50 backdrop-blur-sm border border-border rounded-xl p-5 md:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:bg-card hover:border-primary/30">
+                      <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                        <span class={`text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-md border ${config.bg} ${config.border} font-bold`}>
+                          {config.label}
+                        </span>
+                        <time class="text-sm font-medium text-muted-foreground font-mono">{item.date}</time>
+                      </div>
+
+                      <h3 class="text-xl font-bold mb-2">
+                        {item.url ? (
+                          <a href={item.url} target="_blank" rel="noreferrer" class="hover:text-primary transition-colors hover:underline decoration-primary/50 underline-offset-4">
+                            {item.title}
+                            <span class="inline-block ml-1 opacity-50 text-sm">↗</span>
+                          </a>
+                        ) : (
+                          item.title
+                        )}
+                      </h3>
+
+                      <div class="prose prose-sm prose-zinc dark:prose-invert text-muted-foreground/90 max-w-none leading-relaxed">
+                        {item.description}
+                      </div>
+
+                      {item.tags && item.tags.length > 0 && (
+                        <div class="flex flex-wrap gap-2 mt-5 pt-4 border-t border-border/50">
+                          {item.tags.map((tag: string) => (
+                            <span class="text-xs font-medium text-muted-foreground bg-muted/80 px-2 py-1 rounded-md hover:bg-muted transition-colors">#{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   </div>
 </BaseLayout>

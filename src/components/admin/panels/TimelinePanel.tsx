@@ -80,6 +80,9 @@ export function TimelinePanel() {
               <option value="education">Education</option>
               <option value="milestone">Milestone</option>
               <option value="learning">Learning</option>
+              <option value="project-completed">Project Completed</option>
+              <option value="project-in-progress">Project In Progress</option>
+              <option value="project-abandoned">Project Abandoned</option>
             </select>
             <input name="date" type="date" defaultValue={editing?.date || ""} required className="flex h-9 rounded-md border bg-transparent px-3 text-sm" />
             <input name="sortOrder" type="number" placeholder="Sort" defaultValue={editing?.sortOrder || 0} className="flex h-9 w-20 rounded-md border bg-transparent px-3 text-sm" />
