@@ -43,6 +43,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       cursor: none;
       user-select: none;
       background: hsl(var(--background));
+      transition: background 0.5s ease;
     }
 
     #space {
@@ -96,12 +97,13 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       font-weight: 700;
       color: hsl(var(--foreground));
       margin-bottom: 0.4rem;
-      transition: opacity 0.3s;
+      transition: opacity 0.3s, color 0.5s ease;
     }
 
     .msg-sub {
       color: hsl(var(--muted-foreground));
       font-size: 0.9rem;
+      transition: color 0.5s ease;
       margin-bottom: 1.5rem;
     }
 
@@ -111,8 +113,8 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       border-radius: 0.375rem;
       font-size: 0.875rem;
       font-weight: 600;
-      background: var(--primary);
-      color: var(--primary-foreground);
+      background: var(--color-primary);
+      color: var(--color-primary-foreground);
       border: none;
       cursor: pointer;
       position: relative;
@@ -143,6 +145,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       opacity: 0;
       transition: opacity 0.5s;
       background: hsl(var(--background));
+      transition: background 0.5s ease;
     }
 
     .spaghetti-overlay.active {
@@ -167,21 +170,46 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
     let eaten = false;
     let bhRadius = 70;
 
-    // Theme-aware colors
+    // Theme-aware colors with smooth transition
     let isDark = document.documentElement.classList.contains('dark');
     let bgColor = isDark ? '#09090b' : '#ffffff';
+    let targetBgColor = bgColor;
 
     const themeObserver = new MutationObserver(() => {
       isDark = document.documentElement.classList.contains('dark');
-      bgColor = isDark ? '#09090b' : '#ffffff';
+      targetBgColor = isDark ? '#09090b' : '#ffffff';
     });
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
+    // Lerp hex colors for smooth canvas transition
+    function lerpColor(a: string, b: string, t: number): string {
+      const ah = parseInt(a.slice(1), 16);
+      const bh = parseInt(b.slice(1), 16);
+      const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
+      const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
+      const rr = Math.round(ar + (br - ar) * t);
+      const rg = Math.round(ag + (bg - ag) * t);
+      const rb = Math.round(ab + (bb - ab) * t);
+      return `rgb(${rr},${rg},${rb})`;
+    }
+
     function resize() {
+      const oldW = W || window.innerWidth;
+      const oldH = H || window.innerHeight;
       W = canvas.width = window.innerWidth;
       H = canvas.height = window.innerHeight;
       mx = W / 2; my = H / 2;
       bhX = mx; bhY = my;
+
+      // Scale existing star positions proportionally
+      if (oldW > 0 && oldH > 0) {
+        const scaleX = W / oldW;
+        const scaleY = H / oldH;
+        for (let i = 0; i < NUM_STARS; i++) {
+          starX[i] *= scaleX;
+          starY[i] *= scaleY;
+        }
+      }
     }
     resize();
     window.addEventListener('resize', resize);
@@ -371,6 +399,10 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
 
     // === MAIN LOOP ===
     function tick(now: number) {
+      // Smooth background color transition
+      if (bgColor !== targetBgColor) {
+        bgColor = targetBgColor;
+      }
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, W, H);
 

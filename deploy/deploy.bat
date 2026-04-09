@@ -1,13 +1,26 @@
 @echo off
+setlocal enabledelayedexpansion
 REM Auto-deploy script for dev-blog
 REM Called by webhook.js after receiving a GitHub push event
 
 echo [%date% %time%] Starting deploy...
 
-REM Pull latest code
-git pull origin main
-if errorlevel 1 (
-    echo [%date% %time%] git pull failed
+REM Pull latest code (retry up to 3 times)
+set PULL_OK=0
+for /L %%i in (1,1,3) do (
+    if !PULL_OK! == 0 (
+        echo [%date% %time%] git pull attempt %%i...
+        git pull origin main
+        if !errorlevel! == 0 (
+            set PULL_OK=1
+        ) else (
+            echo [%date% %time%] git pull failed, retrying in 5s...
+            timeout /t 5 /nobreak >nul
+        )
+    )
+)
+if %PULL_OK% == 0 (
+    echo [%date% %time%] git pull failed after 3 attempts
     exit /b 1
 )
 
