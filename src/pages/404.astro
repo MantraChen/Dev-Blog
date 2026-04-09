@@ -2,16 +2,481 @@
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 ---
 
-<BaseLayout title="404 | Not Found">
-  <div class="flex flex-col items-center justify-center min-h-[60vh] text-center">
-    <h1 class="text-7xl font-extrabold tracking-tighter text-muted-foreground/30 mb-4">404</h1>
-    <p class="text-xl font-medium mb-2">Page not found</p>
-    <p class="text-muted-foreground mb-8">The page you're looking for doesn't exist or has been moved.</p>
-    <a
-      href="/"
-      class="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-6 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-    >
-      Back to Home
-    </a>
+<BaseLayout title="404 | Lost in Space">
+  <div id="bhPage" class="bh-page">
+    <canvas id="space"></canvas>
+
+    <div id="debris-zone">
+      <span class="chunk" data-speed="1.2">&lt;div&gt;Not Found&lt;/div&gt;</span>
+      <span class="chunk" data-speed="0.8">segfault</span>
+      <span class="chunk" data-speed="1.5">rm -rf /pages/*</span>
+      <span class="chunk" data-speed="0.6">git push --force</span>
+      <span class="chunk" data-speed="1.0">undefined is not a function</span>
+      <span class="chunk" data-speed="1.3">ERROR 404</span>
+      <span class="chunk" data-speed="0.9">panic: runtime error</span>
+      <span class="chunk" data-speed="1.1">FATAL EXCEPTION</span>
+      <span class="chunk" data-speed="0.7">core dumped</span>
+      <span class="chunk" data-speed="1.4">kernel panic</span>
+      <span class="chunk" data-speed="0.5">npm ERR!</span>
+      <span class="chunk" data-speed="1.6">Cannot read properties of null</span>
+    </div>
+
+    <div id="msgBox" class="msg-box">
+      <p class="msg-main" id="mainMsg">This page crossed the event horizon</p>
+      <p class="msg-sub">Move your cursor around... carefully.</p>
+      <button id="homeBtn" class="home-btn">Take me home</button>
+    </div>
+
+    <div id="spaghetti" class="spaghetti-overlay"></div>
   </div>
+
+  <style>
+    .bh-page {
+      position: relative;
+      width: 100%;
+      min-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: none;
+      user-select: none;
+      background: #000;
+    }
+
+    #space {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+    }
+
+    #debris-zone {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .chunk {
+      position: absolute;
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      color: rgba(255, 160, 80, 0.7);
+      white-space: nowrap;
+      text-shadow: 0 0 6px rgba(255, 100, 0, 0.3);
+      transition: transform 0.05s linear, opacity 0.3s;
+    }
+
+    .chunk.dying {
+      opacity: 0 !important;
+      transform: scale(0) !important;
+    }
+
+    .msg-box {
+      position: relative;
+      z-index: 20;
+      text-align: center;
+      transition: transform 0.8s cubic-bezier(0.2, 0, 0, 1), opacity 0.8s;
+    }
+
+    .msg-box.warped {
+      transform: perspective(200px) rotateX(15deg) scaleY(2) scaleX(0.3);
+      opacity: 0;
+    }
+
+    .msg-main {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 0.4rem;
+      transition: opacity 0.3s;
+    }
+
+    .msg-sub {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .home-btn {
+      display: inline-block;
+      padding: 0.65rem 1.8rem;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border: none;
+      cursor: pointer;
+      position: relative;
+      z-index: 60;
+      transition: all 0.25s;
+      pointer-events: auto;
+    }
+
+    .home-btn:hover {
+      box-shadow: 0 0 25px rgba(255, 120, 0, 0.4);
+      transform: scale(1.05);
+    }
+
+    .home-btn.dodge { transition: transform 0.2s ease-out; }
+
+    .home-btn.surrender {
+      animation: none !important;
+      transform: none !important;
+      box-shadow: 0 0 30px rgba(100, 255, 100, 0.5);
+      background: #22c55e;
+    }
+
+    .spaghetti-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s;
+      background: #000;
+    }
+
+    .spaghetti-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+  </style>
+
+  <script>
+    const canvas = document.getElementById('space') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    const chunks = document.querySelectorAll('.chunk') as NodeListOf<HTMLElement>;
+    const btn = document.getElementById('homeBtn') as HTMLButtonElement;
+    const msgBox = document.getElementById('msgBox')!;
+    const mainMsg = document.getElementById('mainMsg')!;
+    const spaghetti = document.getElementById('spaghetti')!;
+
+    let W = 0, H = 0;
+    let mx = 0, my = 0;
+    let bhX = 0, bhY = 0;
+    let dodgeCount = 0;
+    let eaten = false;
+    let bhRadius = 70;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      mx = W / 2; my = H / 2;
+      bhX = mx; bhY = my;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // === STARS (full screen, lots of them) ===
+    const NUM_STARS = 600;
+    const starX = new Float32Array(NUM_STARS);
+    const starY = new Float32Array(NUM_STARS);
+    const starS = new Float32Array(NUM_STARS); // size
+    const starA = new Float32Array(NUM_STARS); // base alpha
+    const starC = new Uint8Array(NUM_STARS);   // color temp: 0=warm, 1=white, 2=blue
+
+    function spawnStar(i: number) {
+      starX[i] = Math.random() * W;
+      starY[i] = Math.random() * H;
+      starS[i] = Math.random() * 2 + 0.3;
+      starA[i] = Math.random() * 0.7 + 0.3;
+      starC[i] = Math.floor(Math.random() * 3);
+    }
+    for (let i = 0; i < NUM_STARS; i++) spawnStar(i);
+
+    const STAR_COLORS = [
+      [255, 220, 180], // warm
+      [255, 255, 255], // white
+      [180, 200, 255], // blue
+    ];
+
+    // === DRAW BLACK HOLE ON CANVAS ===
+    function drawBlackHole() {
+      const r = bhRadius;
+
+      // outer glow
+      const glowGrad = ctx.createRadialGradient(bhX, bhY, r * 0.8, bhX, bhY, r * 3);
+      glowGrad.addColorStop(0, 'rgba(255, 120, 40, 0.08)');
+      glowGrad.addColorStop(0.5, 'rgba(255, 80, 20, 0.03)');
+      glowGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = glowGrad;
+      ctx.fillRect(bhX - r * 3, bhY - r * 3, r * 6, r * 6);
+
+      // accretion disk - draw as rotating ring of particles
+      const time = performance.now() * 0.001;
+      const ringParticles = 120;
+      for (let i = 0; i < ringParticles; i++) {
+        const angle = (i / ringParticles) * Math.PI * 2 + time * 1.5;
+        const wobble = Math.sin(angle * 3 + time * 2) * 0.15;
+        const dist = r * (1.1 + wobble + Math.sin(i * 0.7) * 0.12);
+        const px = bhX + Math.cos(angle) * dist;
+        const py = bhY + Math.sin(angle) * dist * 0.38; // flatten into ellipse
+
+        // color varies around the ring
+        const hue = (angle * 57.3 + time * 80) % 360;
+        const sat = 80 + Math.sin(angle * 2) * 20;
+        const light = 50 + Math.sin(angle * 5 + time) * 15;
+        const alpha = 0.4 + Math.sin(angle * 3) * 0.2;
+        const size = 2.5 + Math.sin(i * 1.3) * 1.5;
+
+        ctx.beginPath();
+        ctx.arc(px, py, size, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+        ctx.fill();
+      }
+
+      // second ring layer (inner, faster, purple-ish)
+      const ring2 = 80;
+      for (let i = 0; i < ring2; i++) {
+        const angle = (i / ring2) * Math.PI * 2 - time * 2.5;
+        const dist = r * (0.75 + Math.sin(i * 1.1 + time) * 0.08);
+        const px = bhX + Math.cos(angle) * dist;
+        const py = bhY + Math.sin(angle) * dist * 0.32;
+
+        const hue = (280 + angle * 30 + time * 60) % 360;
+        const alpha = 0.3 + Math.sin(angle * 4) * 0.15;
+
+        ctx.beginPath();
+        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${hue}, 90%, 60%, ${alpha})`;
+        ctx.fill();
+      }
+
+      // photon ring (thin bright ring)
+      ctx.beginPath();
+      ctx.ellipse(bhX, bhY, r * 1.05, r * 0.4, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 180, 80, ${0.15 + Math.sin(time * 3) * 0.05})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // gravitational lensing ring (outer subtle distortion hint)
+      ctx.beginPath();
+      ctx.ellipse(bhX, bhY, r * 1.6, r * 0.6, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 160, 60, ${0.04 + Math.sin(time * 2) * 0.02})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // core (absolute black)
+      const coreGrad = ctx.createRadialGradient(bhX, bhY, 0, bhX, bhY, r * 0.55);
+      coreGrad.addColorStop(0, '#000000');
+      coreGrad.addColorStop(0.8, '#000000');
+      coreGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+      ctx.beginPath();
+      ctx.arc(bhX, bhY, r * 0.55, 0, Math.PI * 2);
+      ctx.fillStyle = coreGrad;
+      ctx.fill();
+
+      // "404" text in center
+      ctx.save();
+      ctx.font = `bold ${r * 0.3}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const tAlpha = 0.4 + Math.sin(time * 8) * 0.15;
+      ctx.fillStyle = `rgba(255, 80, 30, ${tAlpha})`;
+      ctx.shadowColor = 'rgba(255, 80, 30, 0.4)';
+      ctx.shadowBlur = 15;
+      ctx.fillText(dodgeCount >= 5 ? ':(' : '404', bhX, bhY);
+      ctx.restore();
+    }
+
+    function drawStars() {
+      for (let i = 0; i < NUM_STARS; i++) {
+        const dx = starX[i] - bhX;
+        const dy = starY[i] - bhY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // gravitational dimming
+        const dim = Math.min(1, dist / (bhRadius * 2.5));
+        // gravitational lensing: stars near hole get displaced outward
+        let drawX = starX[i];
+        let drawY = starY[i];
+        if (dist < bhRadius * 3 && dist > bhRadius * 0.5) {
+          const lensStrength = (1 - dist / (bhRadius * 3)) * 12;
+          drawX += (dx / dist) * lensStrength;
+          drawY += (dy / dist) * lensStrength;
+        }
+
+        const [cr, cg, cb] = STAR_COLORS[starC[i]];
+        const alpha = starA[i] * dim;
+        if (alpha < 0.01) { spawnStar(i); continue; }
+
+        const s = starS[i] * (1 + (1 - dim) * 0.5); // stars stretch near hole
+        ctx.beginPath();
+        ctx.arc(drawX, drawY, s, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${cr},${cg},${cb},${alpha})`;
+        ctx.fill();
+
+        // drift toward black hole
+        if (dist > bhRadius * 0.4) {
+          const pull = Math.min(2, bhRadius * 8 / (dist * dist));
+          starX[i] -= (dx / dist) * pull;
+          starY[i] -= (dy / dist) * pull;
+        } else {
+          spawnStar(i);
+        }
+
+        // slight twinkle
+        starA[i] += (Math.random() - 0.5) * 0.02;
+        starA[i] = Math.max(0.1, Math.min(1, starA[i]));
+      }
+    }
+
+    // === POSITION DEBRIS ===
+    chunks.forEach(c => {
+      c.style.left = (Math.random() * 80 + 10) + '%';
+      c.style.top = (Math.random() * 80 + 10) + '%';
+    });
+
+    // === MOUSE ===
+    document.addEventListener('mousemove', (e) => {
+      if (eaten) return;
+      mx = e.clientX; my = e.clientY;
+    });
+    document.addEventListener('touchmove', (e) => {
+      if (eaten) return;
+      mx = e.touches[0].clientX; my = e.touches[0].clientY;
+    });
+
+    // === MESSAGES ===
+    const messages = [
+      "This page crossed the event horizon",
+      "You found the void between pages",
+      "Even Hawking radiation can't bring this page back",
+      "Spacetime is broken here",
+      "This URL has been spaghettified",
+    ];
+    let msgIndex = 0;
+    let lastMsgSwap = 0;
+
+    // === MAIN LOOP ===
+    function tick(now: number) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+
+      if (eaten) {
+        // after eaten: black hole grows and swallows everything
+        bhRadius = Math.min(bhRadius + 2, Math.max(W, H));
+        drawStars();
+        drawBlackHole();
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      // smooth follow
+      bhX += (mx - bhX) * 0.06;
+      bhY += (my - bhY) * 0.06;
+
+      drawStars();
+      drawBlackHole();
+
+      // cursor dot
+      ctx.beginPath();
+      ctx.arc(mx, my, 3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 200, 100, 0.9)';
+      ctx.shadowColor = 'rgba(255, 160, 50, 0.6)';
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // suck debris
+      chunks.forEach(c => {
+        const rect = c.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dx = bhX - cx;
+        const dy = bhY - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const speed = parseFloat(c.dataset.speed || '1');
+
+        if (dist < 40) {
+          c.classList.add('dying');
+          setTimeout(() => {
+            c.classList.remove('dying');
+            c.style.left = (Math.random() * 80 + 10) + '%';
+            c.style.top = (Math.random() * 80 + 10) + '%';
+          }, 500);
+        } else if (dist < 500) {
+          const pull = (speed * 120) / (dist * dist) * 60;
+          const currentLeft = parseFloat(c.style.left);
+          const currentTop = parseFloat(c.style.top);
+          c.style.left = (currentLeft + (dx / dist) * pull) + '%';
+          c.style.top = (currentTop + (dy / dist) * pull) + '%';
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          const stretch = Math.max(1, 3 - dist / 200);
+          c.style.transform = `rotate(${angle}deg) scaleX(${stretch})`;
+          c.style.opacity = String(Math.min(0.9, dist / 300));
+        }
+      });
+
+      // rotate message
+      if (now - lastMsgSwap > 4000) {
+        msgIndex = (msgIndex + 1) % messages.length;
+        mainMsg.style.opacity = '0';
+        setTimeout(() => {
+          mainMsg.textContent = messages[msgIndex];
+          mainMsg.style.opacity = '1';
+        }, 300);
+        lastMsgSwap = now;
+      }
+
+      // warp text near hole
+      const msgRect = msgBox.getBoundingClientRect();
+      const msgCx = msgRect.left + msgRect.width / 2;
+      const msgCy = msgRect.top + msgRect.height / 2;
+      const msgDist = Math.sqrt((bhX - msgCx) ** 2 + (bhY - msgCy) ** 2);
+      if (msgDist < 180) {
+        const warp = 1 - msgDist / 180;
+        msgBox.style.transform = `perspective(300px) rotateX(${warp * 25}deg) scaleX(${1 - warp * 0.5}) scaleY(${1 + warp * 1.2})`;
+        msgBox.style.opacity = String(1 - warp * 0.6);
+      } else {
+        msgBox.style.transform = '';
+        msgBox.style.opacity = '1';
+      }
+
+      // dodge button
+      const btnRect = btn.getBoundingClientRect();
+      const btnCx = btnRect.left + btnRect.width / 2;
+      const btnCy = btnRect.top + btnRect.height / 2;
+      const btnDist = Math.sqrt((bhX - btnCx) ** 2 + (bhY - btnCy) ** 2);
+
+      if (dodgeCount < 5 && btnDist < 120) {
+        dodgeCount++;
+        btn.classList.add('dodge');
+        const angle = Math.atan2(btnCy - bhY, btnCx - bhX);
+        btn.style.transform = `translate(${Math.cos(angle) * 160}px, ${Math.sin(angle) * 160}px)`;
+        const taunts = ["Nope!", "Too slow!", "Catch me!", "Nice try!", "Lol no"];
+        mainMsg.textContent = taunts[dodgeCount - 1] || "404";
+        lastMsgSwap = now;
+      }
+
+      if (dodgeCount >= 5 && !btn.classList.contains('surrender')) {
+        btn.classList.remove('dodge');
+        btn.classList.add('surrender');
+        btn.style.transform = '';
+        btn.textContent = "OK fine, go home";
+      }
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    // === BUTTON CLICK ===
+    btn.addEventListener('click', () => {
+      if (dodgeCount < 5) return;
+      eaten = true;
+      spaghetti.classList.add('active');
+      msgBox.classList.add('warped');
+      chunks.forEach(c => c.classList.add('dying'));
+      setTimeout(() => { window.location.href = '/'; }, 2000);
+    });
+  </script>
 </BaseLayout>
