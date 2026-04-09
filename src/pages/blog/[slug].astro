@@ -47,7 +47,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
 <BaseLayout title={`${post.title} | Blog`} description={description}>
   <div id="reading-progress"></div>
 
-  <div class="max-w-4xl mx-auto py-10 flex gap-10">
+  <div class="max-w-4xl mx-auto py-10 px-4 sm:px-6 flex gap-10">
     <article class="flex-1 min-w-0">
 
       <header class="mb-10 reveal">
@@ -59,9 +59,9 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
               class="absolute inset-0 w-full h-full object-cover"
             />
             <div class="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent"></div>
-            <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+            <div class="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8">
               <h1 class="text-3xl font-extrabold tracking-tight lg:text-4xl text-foreground drop-shadow-md">{post.title}</h1>
-              <div class="flex items-center gap-4 text-muted-foreground mt-3">
+              <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-muted-foreground mt-3">
                 <time>
                   {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
                 </time>
@@ -80,7 +80,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         )}
         {!post.coverImage && (
           <>
-            <h1 class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4">{post.title}</h1>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight lg:text-5xl mb-4">{post.title}</h1>
             <div class="flex items-center gap-4 text-muted-foreground">
               <time>
                 {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
@@ -105,7 +105,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
 
       <ReactionBar slug={slug!} client:idle />
 
-      <nav class="mt-12 flex justify-between items-center border-t border-border pt-6">
+      <nav class="mt-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-t border-border pt-6">
         {prev ? (
           <a href={`/blog/${prev.slug}`} class="text-sm text-muted-foreground hover:text-foreground transition-colors">
             ← {prev.title}

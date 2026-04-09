@@ -37,7 +37,7 @@ const topSkills = skills.slice(0, 12)
         </p>
       </div>
 
-      <div class="flex items-center gap-4 hero-animate" style="animation-delay: 300ms">
+      <div class="flex flex-wrap items-center gap-4 hero-animate" style="animation-delay: 300ms">
         <a
           href="https://github.com/mantrachen"
           target="_blank"
@@ -62,7 +62,7 @@ const topSkills = skills.slice(0, 12)
     </div>
   </section>
 
-  <div class="grid gap-12 md:grid-cols-2 mt-8">
+  <div class="grid gap-8 md:gap-12 md:grid-cols-2 mt-8">
     <section>
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-semibold tracking-tight">Recent Writing</h2>
@@ -77,7 +77,7 @@ const topSkills = skills.slice(0, 12)
               <img
                 src={post.coverImage}
                 alt={post.title}
-                class="w-full h-32 aspect-video object-cover border-b border-border bg-muted/50"
+                class="w-full h-28 sm:h-32 aspect-video object-cover border-b border-border bg-muted/50"
               />
             )}
             <div class="p-5 flex flex-col gap-2">

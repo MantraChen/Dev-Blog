@@ -143,7 +143,7 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
                     <p className="text-sm text-muted-foreground line-clamp-2">
                       {post.description}
                     </p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
                         <time>
                           {new Date(post.publishedAt).toLocaleDateString()}
@@ -151,7 +151,7 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
                         <span>·</span>
                         <span>{post.readingTime} min read</span>
                       </div>
-                      <div className="flex gap-1">
+                      <div className="flex flex-wrap gap-1">
                         {post.tags.map((tag) => (
                           <span
                             key={tag}

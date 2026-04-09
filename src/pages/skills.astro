@@ -17,7 +17,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-r
 ---
 
 <BaseLayout title="Skills | Tech Blog" description="Technical skills and proficiency">
-  <div class="max-w-3xl mx-auto py-10">
+  <div class="max-w-3xl mx-auto py-10 px-4 sm:px-6">
     <h1 class="text-3xl font-bold tracking-tight mb-8">Skills</h1>
     {categories.length === 0 && (
       <p class="text-muted-foreground text-center py-12">No skills added yet.</p>
@@ -29,7 +29,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-r
           <div class="grid gap-3">
             {items.map((skill) => (
               <div class="flex items-center gap-4">
-                <span class="text-sm font-medium w-32 shrink-0">{skill.name}</span>
+                <span class="text-xs sm:text-sm font-medium w-24 sm:w-32 shrink-0">{skill.name}</span>
                 <div class="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
                   <div
                     class="h-full rounded-full bg-primary transition-all"
