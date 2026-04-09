@@ -53,8 +53,8 @@ function deploy() {
   log("=== Deploy started ===");
 
   // Run deploy in background so webhook can respond immediately
-  const script = path.join(__dirname, "deploy.bat");
-  exec(`"${script}"`, { cwd: DEPLOY_DIR, windowsHide: true }, (err, stdout, stderr) => {
+  const script = path.join(__dirname, "deploy.ps1");
+  exec(`powershell -ExecutionPolicy Bypass -File "${script}"`, { cwd: DEPLOY_DIR, windowsHide: true, encoding: "utf8" }, (err, stdout, stderr) => {
     deploying = false;
     if (err) {
       log(`Deploy FAILED: ${err.message}`);
