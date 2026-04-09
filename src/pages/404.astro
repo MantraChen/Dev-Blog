@@ -193,6 +193,22 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       return `rgb(${rr},${rg},${rb})`;
     }
 
+    // === STARS (full screen, lots of them) ===
+    const NUM_STARS = 600;
+    const starX = new Float32Array(NUM_STARS);
+    const starY = new Float32Array(NUM_STARS);
+    const starS = new Float32Array(NUM_STARS); // size
+    const starA = new Float32Array(NUM_STARS); // base alpha
+    const starC = new Uint8Array(NUM_STARS);   // color temp: 0=warm, 1=white, 2=blue
+
+    function spawnStar(i: number) {
+      starX[i] = Math.random() * W;
+      starY[i] = Math.random() * H;
+      starS[i] = Math.random() * 2 + 0.3;
+      starA[i] = Math.random() * 0.7 + 0.3;
+      starC[i] = Math.floor(Math.random() * 3);
+    }
+
     function resize() {
       const oldW = W || window.innerWidth;
       const oldH = H || window.innerHeight;
@@ -213,22 +229,6 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
     }
     resize();
     window.addEventListener('resize', resize);
-
-    // === STARS (full screen, lots of them) ===
-    const NUM_STARS = 600;
-    const starX = new Float32Array(NUM_STARS);
-    const starY = new Float32Array(NUM_STARS);
-    const starS = new Float32Array(NUM_STARS); // size
-    const starA = new Float32Array(NUM_STARS); // base alpha
-    const starC = new Uint8Array(NUM_STARS);   // color temp: 0=warm, 1=white, 2=blue
-
-    function spawnStar(i: number) {
-      starX[i] = Math.random() * W;
-      starY[i] = Math.random() * H;
-      starS[i] = Math.random() * 2 + 0.3;
-      starA[i] = Math.random() * 0.7 + 0.3;
-      starC[i] = Math.floor(Math.random() * 3);
-    }
     for (let i = 0; i < NUM_STARS; i++) spawnStar(i);
 
     function getStarColors(): [number, number, number][] {
