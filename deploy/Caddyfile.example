@@ -1,0 +1,7 @@
+yourdomain.com {
+    # Webhook (must be before the catch-all)
+    reverse_proxy /webhook localhost:9000
+
+    # Blog
+    reverse_proxy * localhost:4321
+}
