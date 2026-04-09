@@ -1,4 +1,4 @@
-# HowieSun - Personal Tech Blog
+# HowieSun - Personal Blog
 
 A personal technical blog built with Astro 6 SSR, deployed on Windows Server 2022 with Caddy reverse proxy.
 
