@@ -83,8 +83,7 @@ const isActive = (href: string) => {
 </header>
 
 <script>
-  // 封装为函数，兼容可能存在的 Astro View Transitions (<ViewTransitions />)
-  const setupMobileMenu = () => {
+  function setupMobileMenu() {
     const btn = document.getElementById('mobile-menu-btn');
     const panel = document.getElementById('mobile-menu-panel');
     const iconOpen = document.getElementById('menu-icon-open');
@@ -92,43 +91,48 @@ const isActive = (href: string) => {
 
     if (!btn || !panel || !iconOpen || !iconClose) return;
 
-    let isOpen = false;
+    // 防止重复绑定
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = 'true';
 
-    // 统一切换函数
-    const toggleMenu = () => {
-      isOpen = !isOpen;
-      if (isOpen) {
-        panel.classList.remove('max-h-0', 'opacity-0');
-        panel.classList.add('max-h-[500px]', 'opacity-100');
-        iconOpen.classList.add('hidden');
-        iconClose.classList.remove('hidden');
-      } else {
-        panel.classList.remove('max-h-[500px]', 'opacity-100');
-        panel.classList.add('max-h-0', 'opacity-0');
-        iconOpen.classList.remove('hidden');
-        iconClose.classList.add('hidden');
-      }
+    const openMenu = () => {
+      panel.classList.remove('max-h-0', 'opacity-0');
+      panel.classList.add('max-h-[500px]', 'opacity-100');
+      iconOpen.classList.add('hidden');
+      iconClose.classList.remove('hidden');
+      btn.setAttribute('aria-expanded', 'true');
     };
 
-    // 绑定按钮点击事件
-    btn.addEventListener('click', toggleMenu);
+    const closeMenu = () => {
+      panel.classList.remove('max-h-[500px]', 'opacity-100');
+      panel.classList.add('max-h-0', 'opacity-0');
+      iconOpen.classList.remove('hidden');
+      iconClose.classList.add('hidden');
+      btn.setAttribute('aria-expanded', 'false');
+    };
 
-    // 点击链接后自动收起菜单
-    const links = panel.querySelectorAll('a');
-    links.forEach(link => {
-      link.addEventListener('click', () => {
-        if (isOpen) toggleMenu();
-      });
+    const isMenuOpen = () => btn.getAttribute('aria-expanded') === 'true';
+
+    btn.addEventListener('click', () => {
+      if (isMenuOpen()) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
     });
-  };
 
-  // 支持 Astro 路由跳转生命周期
-  document.addEventListener('astro:page-load', setupMobileMenu);
+    panel.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', closeMenu);
+    });
 
-  // 原生首次加载
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupMobileMenu);
-  } else {
-    setupMobileMenu();
+    // 点击页面其他区域关闭菜单
+    document.addEventListener('click', (e) => {
+      if (isMenuOpen() && !btn.contains(e.target) && !panel.contains(e.target)) {
+        closeMenu();
+      }
+    });
   }
+
+  setupMobileMenu();
+  document.addEventListener('astro:page-load', setupMobileMenu);
 </script>

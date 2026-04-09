@@ -1,6 +1,6 @@
 # Mantra Chen - Personal Tech Blog
 
-A personal technical blog built with Astro 6 SSR, showcasing projects in concurrent data structures, spatial indexing, and systems programming.
+A personal technical blog built with Astro 6 SSR, deployed on Windows Server 2022 with Caddy reverse proxy.
 
 ## Tech Stack
 
@@ -10,6 +10,7 @@ A personal technical blog built with Astro 6 SSR, showcasing projects in concurr
 - **Content**: Markdown blog posts stored in SQLite, rendered server-side via `marked` with highlight.js code highlighting and KaTeX math rendering
 - **Islands**: React 19 (minimal client JS — TagFilter with search, ThemeToggle, AdminApp)
 - **Comments**: Giscus (GitHub Discussions)
+- **Deployment**: Windows Server 2022 + Caddy (auto HTTPS) + NSSM (service manager)
 
 ## Features
 
@@ -20,9 +21,9 @@ A personal technical blog built with Astro 6 SSR, showcasing projects in concurr
 - Full-text search with 300ms debounce
 - Tag-based filtering
 - View count tracking per post
-- Emoji reactions per post (👍 🎉 ❤️ 🚀 👀 🤔)
+- Emoji reactions per post
 - Previous/next post navigation
-- Reading progress bar and TOC sidebar
+- Reading progress bar and TOC sidebar (desktop sidebar + mobile drawer)
 - Giscus comment system
 - Archive page (posts grouped by year/month)
 
@@ -31,8 +32,16 @@ A personal technical blog built with Astro 6 SSR, showcasing projects in concurr
 - **Admin panel**: Session-based auth (bcrypt + HttpOnly cookies), 7 tabs — Blog, Projects, Statuses, Skills, Timeline, Friends, Stats
 - **Stats dashboard**: Total views, top posts ranking, daily views bar chart (last 30 days)
 
+### UI & Responsive
+- Fully responsive mobile-first design with Tailwind CSS breakpoints
+- Mobile hamburger menu with smooth slide-down animation and outside-click-to-close
+- Dynamic favicon that follows dark/light theme switching
+- Smooth theme transition animation (0.3s ease on background, text, borders)
+- Interactive 404 page with canvas black hole animation (cursor-following, debris spaghettification, dodge button easter egg)
+- Hero entrance animations, scroll reveal effects, View Transitions
+
 ### Security
-- Security middleware with HTTP security headers (CSP, X-Frame-Options, HSTS, Referrer-Policy, Permissions-Policy)
+- Caddy reverse proxy with security response headers (CSP, X-Frame-Options, HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
 - Input validation on all API routes via Zod schemas
 - Login rate limiting (5 attempts per 15 minutes per IP)
 - Public API rate limiting (60 requests per minute per IP)
@@ -42,22 +51,24 @@ A personal technical blog built with Astro 6 SSR, showcasing projects in concurr
 - Markdown raw HTML sanitization to prevent XSS
 - Strict ID parameter parsing on all API routes
 - Cache-Control: no-store on all authenticated API responses
+- SQLite database not accessible via HTTP
+- Windows Server hardened: non-standard RDP port, account lockout policy, unnecessary services disabled, firewall restricted to 80/443/RDP only
 
 ### Performance & SEO
 - SSR cache headers on all public pages (Cache-Control + stale-while-revalidate)
 - RSS feed, sitemap, SEO meta/OG tags
-- Dark mode, View Transitions, scroll reveal animations
+- Dark mode with smooth transition, View Transitions, scroll reveal animations
 
 ## Project Structure
 
 ```
 src/
   components/
-    layout/              # BaseLayout, Nav
+    layout/              # BaseLayout, Nav (with mobile hamburger menu)
     blog/                # TagFilter with search, ReactionBar (React islands)
     admin/               # AdminApp (React island, tab router)
       panels/            # BlogPanel, ProjectsPanel, StatusesPanel, SkillsPanel, TimelinePanel, FriendsPanel, StatsPanel
-    ThemeToggle.tsx       # Dark/light mode toggle
+    ThemeToggle.tsx       # Dark/light mode toggle with smooth transition
   db/
     schema.ts            # Drizzle schema (posts, postViews, projects, statuses, skills, timeline, friends, reactions, adminSessions, auditLogs)
     queries.ts           # Database queries (CRUD, search, view counts, reactions, stats, audit logs)
@@ -71,6 +82,7 @@ src/
     timeline.astro       # Career timeline
     archive.astro        # Posts archive by year/month
     friends.astro        # Blogroll / friend links
+    404.astro            # Interactive black hole 404 page
     rss.xml.ts           # RSS feed
     sitemap.xml.ts       # Dynamic sitemap
   lib/
@@ -79,17 +91,38 @@ src/
     validation.ts        # Zod schemas for API input validation + safe body parser
     utils.ts             # cn() helper
   middleware.ts          # Security headers, public API rate limiting, body size limit
-  styles/globals.css     # Tailwind + CSS custom properties
+  styles/globals.css     # Tailwind + CSS custom properties + mobile prose adjustments + theme transition
+```
+
+## Deployment
+
+Deployed on Windows Server 2022 Datacenter (2C2G) with:
+
+- **Node.js 22 LTS** running `dist/server/entry.mjs`
+- **NSSM** registering Node as a Windows service (auto-restart, boot start)
+- **Caddy** as reverse proxy (auto HTTPS via Let's Encrypt, security headers)
+- **Firewall**: only ports 80, 443, and custom RDP port open
+
+### Deploy / Update
+
+```powershell
+cd C:\sites\dev-blog
+git pull
+npm install
+.\node_modules\.bin\astro.cmd build
+nssm restart dev-blog
 ```
 
 ## Commands
 
-| Command           | Action                                     |
-| :---------------- | :----------------------------------------- |
-| `npm install`     | Install dependencies                       |
-| `npm run dev`     | Start dev server at `localhost:4321`       |
-| `npm run build`   | Build production site to `./dist/`         |
-| `npm run preview` | Preview production build locally           |
+| Command                      | Action                                     |
+| :--------------------------- | :----------------------------------------- |
+| `npm install`                | Install dependencies                       |
+| `npm run dev`                | Start dev server at `localhost:4321`       |
+| `npm run build`              | Build production site to `./dist/`         |
+| `npm run preview`            | Preview production build locally           |
+| `npx drizzle-kit push`       | Push schema changes to SQLite DB           |
+| `npx drizzle-kit studio`     | Visual DB explorer                         |
 
 ## Environment Variables
 
