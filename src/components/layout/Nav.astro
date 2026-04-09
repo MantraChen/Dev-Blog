@@ -1,20 +1,134 @@
 ---
 import { ThemeToggle } from "@/components/ThemeToggle"
+
+// 获取当前路径，用于链接高亮状态判断
+const pathname = new URL(Astro.request.url).pathname;
+
+// 提取导航链接列表，便于统一维护和在两套菜单中渲染
+const navLinks = [
+  { name: "Home", href: "/" },
+  { name: "Blog", href: "/blog" },
+  { name: "Projects", href: "/projects" },
+  { name: "Skills", href: "/skills" },
+  { name: "Timeline", href: "/timeline" },
+  { name: "Archive", href: "/archive" },
+  { name: "Friends", href: "/friends" }
+];
+
+// 判断是否是当前页面的逻辑
+const isActive = (href: string) => {
+  if (href === "/") return pathname === "/";
+  return pathname.startsWith(href);
+};
 ---
 
 <header class="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-  <div class="container mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-    <nav class="flex items-center space-x-6 text-sm font-medium">
-      <a href="/" class="transition-colors hover:text-foreground/80 text-foreground">Home</a>
-      <a href="/blog" class="transition-colors hover:text-foreground/80 text-foreground/60">Blog</a>
-      <a href="/projects" class="transition-colors hover:text-foreground/80 text-foreground/60">Projects</a>
-      <a href="/skills" class="transition-colors hover:text-foreground/80 text-foreground/60">Skills</a>
-      <a href="/timeline" class="transition-colors hover:text-foreground/80 text-foreground/60">Timeline</a>
-      <a href="/archive" class="transition-colors hover:text-foreground/80 text-foreground/60">Archive</a>
-      <a href="/friends" class="transition-colors hover:text-foreground/80 text-foreground/60">Friends</a>
+  <div class="container mx-auto flex h-14 max-w-5xl items-center justify-between px-4 relative">
+
+    <nav class="hidden md:flex items-center space-x-6 text-sm font-medium">
+      {navLinks.map((link) => (
+        <a
+          href={link.href}
+          class={`transition-colors hover:text-foreground/80 ${
+            isActive(link.href) ? "text-foreground font-semibold" : "text-foreground/60"
+          }`}
+        >
+          {link.name}
+        </a>
+      ))}
     </nav>
-    <div class="flex items-center space-x-4">
+
+    <div class="flex-1 md:hidden"></div>
+
+    <div class="flex items-center space-x-2 md:space-x-4">
       <ThemeToggle client:load />
+
+      <button
+        id="mobile-menu-btn"
+        class="md:hidden flex items-center justify-center p-2 text-foreground/60 hover:text-foreground focus:outline-none transition-colors"
+        aria-label="Toggle Menu"
+      >
+        <svg id="menu-icon-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="block">
+          <line x1="4" x2="20" y1="12" y2="12" />
+          <line x1="4" x2="20" y1="6" y2="6" />
+          <line x1="4" x2="20" y1="18" y2="18" />
+        </svg>
+        <svg id="menu-icon-close" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden">
+          <path d="M18 6 6 18" />
+          <path d="m6 6 12 12" />
+        </svg>
+      </button>
     </div>
   </div>
+
+  <div
+    id="mobile-menu-panel"
+    class="absolute left-0 top-14 w-full bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 border-b overflow-hidden transition-all duration-300 ease-in-out md:hidden max-h-0 opacity-0 shadow-sm"
+  >
+    <nav class="flex flex-col px-4 py-3 space-y-2">
+      {navLinks.map((link) => (
+        <a
+          href={link.href}
+          class={`flex items-center min-h-[44px] px-3 rounded-md transition-colors text-base font-medium ${
+            isActive(link.href)
+              ? "text-foreground font-semibold bg-foreground/10"
+              : "text-foreground/70 hover:text-foreground hover:bg-foreground/5"
+          }`}
+        >
+          {link.name}
+        </a>
+      ))}
+    </nav>
+  </div>
 </header>
+
+<script>
+  // 封装为函数，兼容可能存在的 Astro View Transitions (<ViewTransitions />)
+  const setupMobileMenu = () => {
+    const btn = document.getElementById('mobile-menu-btn');
+    const panel = document.getElementById('mobile-menu-panel');
+    const iconOpen = document.getElementById('menu-icon-open');
+    const iconClose = document.getElementById('menu-icon-close');
+
+    if (!btn || !panel || !iconOpen || !iconClose) return;
+
+    let isOpen = false;
+
+    // 统一切换函数
+    const toggleMenu = () => {
+      isOpen = !isOpen;
+      if (isOpen) {
+        panel.classList.remove('max-h-0', 'opacity-0');
+        panel.classList.add('max-h-[500px]', 'opacity-100');
+        iconOpen.classList.add('hidden');
+        iconClose.classList.remove('hidden');
+      } else {
+        panel.classList.remove('max-h-[500px]', 'opacity-100');
+        panel.classList.add('max-h-0', 'opacity-0');
+        iconOpen.classList.remove('hidden');
+        iconClose.classList.add('hidden');
+      }
+    };
+
+    // 绑定按钮点击事件
+    btn.addEventListener('click', toggleMenu);
+
+    // 点击链接后自动收起菜单
+    const links = panel.querySelectorAll('a');
+    links.forEach(link => {
+      link.addEventListener('click', () => {
+        if (isOpen) toggleMenu();
+      });
+    });
+  };
+
+  // 支持 Astro 路由跳转生命周期
+  document.addEventListener('astro:page-load', setupMobileMenu);
+
+  // 原生首次加载
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupMobileMenu);
+  } else {
+    setupMobileMenu();
+  }
+</script>
