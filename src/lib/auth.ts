@@ -92,10 +92,12 @@ function parseCookie(header: string, name: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+const IP_PATTERN = /^[\d.:a-fA-F]{1,45}$/;
+
 export function getClientIp(request: Request): string {
-  return (
+  const raw =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+    "unknown";
+  return IP_PATTERN.test(raw) ? raw : "unknown";
 }

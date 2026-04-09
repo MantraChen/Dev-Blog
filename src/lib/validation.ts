@@ -25,7 +25,7 @@ export const createPostSchema = z.object({
     .max(200)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
   description: z.string().max(500).default(""),
-  coverImage: z.string().max(500).nullable().default(null),
+  coverImage: httpUrl.nullable().default(null),
   series: z.string().max(100).nullable().default(null),
   content: z.string().max(500_000).default(""),
   tags: z.array(z.string().max(50)).max(20).default([]),
@@ -66,7 +66,7 @@ export const updateSkillSchema = createSkillSchema.partial();
 export const createFriendSchema = z.object({
   name: z.string().min(1).max(100),
   url: httpUrl,
-  avatar: z.string().max(500).nullable().default(null),
+  avatar: httpUrl.nullable().default(null),
   description: z.string().max(500).nullable().default(null),
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });

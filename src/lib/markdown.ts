@@ -18,7 +18,12 @@ const renderer = new marked.Renderer();
 renderer.heading = ({ tokens, depth }) => {
   const text = tokens.map((t) => ("text" in t ? t.text : t.raw)).join("");
   const id = slugify(text);
-  return `<h${depth} id="${id}">${text}</h${depth}>\n`;
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+  return `<h${depth} id="${id}">${escaped}</h${depth}>\n`;
 };
 
 // Sanitize raw HTML blocks — prevent XSS via markdown injection

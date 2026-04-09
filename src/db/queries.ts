@@ -1,4 +1,4 @@
-import { desc, eq, lt, like, or, count, sql } from "drizzle-orm";
+import { and, desc, eq, lt, like, or, count, sql } from "drizzle-orm";
 import { db } from ".";
 import { projects, posts, postViews, statuses, skills, timeline, friends, reactions, adminSessions, auditLogs } from "./schema";
 import type {
@@ -195,10 +195,13 @@ export async function searchPosts(query: string): Promise<PostItem[]> {
     })
     .from(posts)
     .where(
-      or(
-        like(posts.title, pattern),
-        like(posts.description, pattern),
-        like(posts.content, pattern),
+      and(
+        eq(posts.draft, false),
+        or(
+          like(posts.title, pattern),
+          like(posts.description, pattern),
+          like(posts.content, pattern),
+        ),
       )
     )
     .orderBy(desc(posts.publishedAt));
@@ -373,7 +376,7 @@ export async function getViewsByDay(days = 30) {
       views: count(),
     })
     .from(postViews)
-    .where(sql`${postViews.createdAt} >= datetime('now', '-${sql.raw(String(days))} days')`)
+    .where(sql`${postViews.createdAt} >= ${new Date(Date.now() - days * 86400_000).toISOString()}`)
     .groupBy(sql`date(${postViews.createdAt})`)
     .orderBy(sql`date(${postViews.createdAt})`);
   return rows;

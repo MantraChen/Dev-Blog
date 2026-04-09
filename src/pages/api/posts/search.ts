@@ -4,7 +4,7 @@ import { searchPosts } from "@/db/queries";
 export const GET: APIRoute = async ({ url }) => {
   const query = url.searchParams.get("q")?.trim();
 
-  if (!query || query.length < 2) {
+  if (!query || query.length < 2 || query.length > 200) {
     return new Response(JSON.stringify([]), {
       headers: { "Content-Type": "application/json" },
     });

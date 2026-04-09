@@ -59,7 +59,8 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
     <div>
       <input
         type="text"
-        placeholder="搜索文章..."
+        placeholder="Search posts..."
+        aria-label="Search posts"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 mb-6"
@@ -135,6 +136,7 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
                     <img
                       src={post.coverImage}
                       alt={post.title}
+                      loading="lazy"
                       className="w-full h-32 aspect-video object-cover border-b border-border bg-muted/50"
                     />
                   )}
@@ -145,7 +147,7 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
                     </p>
                     <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
-                        <time>
+                        <time dateTime={post.publishedAt}>
                           {new Date(post.publishedAt).toLocaleDateString()}
                         </time>
                         <span>·</span>
@@ -169,7 +171,7 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
 
             {displayPosts.length === 0 && (
               <p className="text-muted-foreground text-center py-8">
-                {searchResults !== null ? "没有找到相关文章" : "没有文章"}
+                {searchResults !== null ? "No matching posts found" : "No posts yet"}
               </p>
             )}
           </>

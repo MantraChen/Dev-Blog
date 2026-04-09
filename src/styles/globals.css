@@ -151,7 +151,8 @@
   transition: opacity 0.2s;
 }
 
-.prose pre:hover .copy-btn {
+.prose pre:hover .copy-btn,
+.prose pre:focus-within .copy-btn {
   opacity: 1;
 }
 

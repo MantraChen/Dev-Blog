@@ -19,12 +19,14 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
+const IP_PATTERN = /^[\d.:a-fA-F]{1,45}$/;
+
 function getIp(request: Request): string {
-  return (
+  const raw =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+    "unknown";
+  return IP_PATTERN.test(raw) ? raw : "unknown";
 }
 
 function checkPublicRateLimit(ip: string): {
@@ -101,11 +103,12 @@ export const onRequest = defineMiddleware(async ({ request }, next) => {
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' https://giscus.app",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
       "img-src 'self' data: https:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://fonts.gstatic.com",
       "connect-src 'self'",
+      "frame-src https://giscus.app",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

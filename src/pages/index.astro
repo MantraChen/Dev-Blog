@@ -14,7 +14,7 @@ const topSkills = skills.slice(0, 12)
 ---
 
 <BaseLayout title="Howie Sun | Tech Blog">
-  <section class="space-y-8 pb-8 pt-6 md:pb-12 md:pt-10 lg:py-24">
+  <section class="space-y-8 pb-8 pt-6 md:pb-12 md:pt-10 lg:py-24 px-4 sm:px-6">
     <div class="flex max-w-6xl flex-col items-start gap-6">
 
       <div class="hero-animate" style="animation-delay: 0ms">
@@ -77,6 +77,7 @@ const topSkills = skills.slice(0, 12)
               <img
                 src={post.coverImage}
                 alt={post.title}
+                loading="lazy"
                 class="w-full h-28 sm:h-32 aspect-video object-cover border-b border-border bg-muted/50"
               />
             )}
@@ -84,7 +85,7 @@ const topSkills = skills.slice(0, 12)
               <h3 class="font-semibold group-hover:text-primary transition-colors">{post.title}</h3>
               <p class="text-sm text-muted-foreground line-clamp-2">{post.description}</p>
               <div class="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                <time>
+                <time datetime={post.publishedAt}>
                   {new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                 </time>
                 <span>·</span>

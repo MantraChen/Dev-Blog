@@ -32,10 +32,10 @@ const years = Object.keys(grouped).sort((a, b) => Number(b) - Number(a))
             <ul class="space-y-2">
               {monthPosts.map(post => (
                 <li class="flex items-baseline gap-4">
-                  <time class="text-xs text-muted-foreground tabular-nums shrink-0 w-12">
+                  <time datetime={post.publishedAt} class="text-xs text-muted-foreground tabular-nums shrink-0 w-12">
                     {new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </time>
-                  <a href={`/blog/${post.slug}`} class="text-sm hover:text-primary transition-colors truncate">
+                  <a href={`/blog/${post.slug}`} class="text-sm hover:text-primary transition-colors truncate" title={post.title}>
                     {post.title}
                   </a>
                 </li>

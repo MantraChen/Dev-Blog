@@ -56,13 +56,14 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
             <img
               src={post.coverImage}
               alt={post.title}
+              loading="eager"
               class="absolute inset-0 w-full h-full object-cover"
             />
             <div class="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent"></div>
             <div class="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8">
-              <h1 class="text-3xl font-extrabold tracking-tight lg:text-4xl text-foreground drop-shadow-md">{post.title}</h1>
+              <h1 class="text-3xl font-extrabold tracking-tight lg:text-4xl text-foreground drop-shadow-md break-words">{post.title}</h1>
               <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-muted-foreground mt-3">
-                <time>
+                <time datetime={post.publishedAt}>
                   {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
                 </time>
                 <span>·</span>
@@ -183,7 +184,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
       <div id="toc-drawer" class="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border rounded-t-xl max-h-[60vh] flex flex-col translate-y-full transition-transform duration-300 ease-out lg:hidden">
         <div class="flex items-center justify-between p-4 border-b border-border shrink-0">
           <span class="font-semibold text-foreground">On this page</span>
-          <button id="toc-close-btn" class="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors" aria-label="Close">
+          <button id="toc-close-btn" class="text-muted-foreground hover:text-foreground p-2.5 rounded-md hover:bg-muted transition-colors" aria-label="Close">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
@@ -226,6 +227,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         const btn = document.createElement('button');
         btn.className = 'copy-btn';
         btn.textContent = 'Copy';
+        btn.setAttribute('aria-label', 'Copy code');
         btn.addEventListener('click', async () => {
           const code = pre.querySelector('code')?.textContent || '';
           await navigator.clipboard.writeText(code);
