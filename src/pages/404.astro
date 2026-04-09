@@ -42,7 +42,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       overflow: hidden;
       cursor: none;
       user-select: none;
-      background: #000;
+      background: hsl(var(--background));
     }
 
     #space {
@@ -68,9 +68,9 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       position: absolute;
       font-family: 'Courier New', monospace;
       font-size: 0.75rem;
-      color: rgba(255, 160, 80, 0.7);
+      color: rgba(255, 120, 50, 0.85);
       white-space: nowrap;
-      text-shadow: 0 0 6px rgba(255, 100, 0, 0.3);
+      text-shadow: 0 0 6px rgba(255, 100, 0, 0.4);
       transition: transform 0.05s linear, opacity 0.3s;
     }
 
@@ -94,13 +94,13 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
     .msg-main {
       font-size: 1.2rem;
       font-weight: 700;
-      color: #e2e8f0;
+      color: hsl(var(--foreground));
       margin-bottom: 0.4rem;
       transition: opacity 0.3s;
     }
 
     .msg-sub {
-      color: #94a3b8;
+      color: hsl(var(--muted-foreground));
       font-size: 0.9rem;
       margin-bottom: 1.5rem;
     }
@@ -142,7 +142,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.5s;
-      background: #000;
+      background: hsl(var(--background));
     }
 
     .spaghetti-overlay.active {
@@ -166,6 +166,16 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
     let dodgeCount = 0;
     let eaten = false;
     let bhRadius = 70;
+
+    // Theme-aware colors
+    let isDark = document.documentElement.classList.contains('dark');
+    let bgColor = isDark ? '#09090b' : '#ffffff';
+
+    const themeObserver = new MutationObserver(() => {
+      isDark = document.documentElement.classList.contains('dark');
+      bgColor = isDark ? '#09090b' : '#ffffff';
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
     function resize() {
       W = canvas.width = window.innerWidth;
@@ -193,20 +203,21 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
     }
     for (let i = 0; i < NUM_STARS; i++) spawnStar(i);
 
-    const STAR_COLORS = [
-      [255, 220, 180], // warm
-      [255, 255, 255], // white
-      [180, 200, 255], // blue
-    ];
+    function getStarColors(): [number, number, number][] {
+      return isDark
+        ? [[255, 220, 180], [255, 255, 255], [180, 200, 255]]
+        : [[120, 80, 40], [60, 60, 60], [40, 60, 120]];
+    }
 
     // === DRAW BLACK HOLE ON CANVAS ===
     function drawBlackHole() {
       const r = bhRadius;
 
       // outer glow
+      const glowAlpha = isDark ? 0.08 : 0.15;
       const glowGrad = ctx.createRadialGradient(bhX, bhY, r * 0.8, bhX, bhY, r * 3);
-      glowGrad.addColorStop(0, 'rgba(255, 120, 40, 0.08)');
-      glowGrad.addColorStop(0.5, 'rgba(255, 80, 20, 0.03)');
+      glowGrad.addColorStop(0, `rgba(255, 120, 40, ${glowAlpha})`);
+      glowGrad.addColorStop(0.5, `rgba(255, 80, 20, ${glowAlpha * 0.4})`);
       glowGrad.addColorStop(1, 'transparent');
       ctx.fillStyle = glowGrad;
       ctx.fillRect(bhX - r * 3, bhY - r * 3, r * 6, r * 6);
@@ -265,11 +276,12 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // core (absolute black)
+      // core (theme-aware dark center)
+      const coreColor = isDark ? '#000000' : '#1a1a2e';
       const coreGrad = ctx.createRadialGradient(bhX, bhY, 0, bhX, bhY, r * 0.55);
-      coreGrad.addColorStop(0, '#000000');
-      coreGrad.addColorStop(0.8, '#000000');
-      coreGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+      coreGrad.addColorStop(0, coreColor);
+      coreGrad.addColorStop(0.8, coreColor);
+      coreGrad.addColorStop(1, isDark ? 'rgba(0,0,0,0.6)' : 'rgba(26,26,46,0.6)');
       ctx.beginPath();
       ctx.arc(bhX, bhY, r * 0.55, 0, Math.PI * 2);
       ctx.fillStyle = coreGrad;
@@ -305,7 +317,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
           drawY += (dy / dist) * lensStrength;
         }
 
-        const [cr, cg, cb] = STAR_COLORS[starC[i]];
+        const [cr, cg, cb] = getStarColors()[starC[i]];
         const alpha = starA[i] * dim;
         if (alpha < 0.01) { spawnStar(i); continue; }
 
@@ -359,7 +371,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
 
     // === MAIN LOOP ===
     function tick(now: number) {
-      ctx.fillStyle = '#000';
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, W, H);
 
       if (eaten) {
