@@ -171,6 +171,12 @@
   overflow-y: hidden;
 }
 
+/* ─── Giscus Comments ─────────────────────────────────────────────── */
+.giscus,
+.giscus-frame {
+  width: 100% !important;
+}
+
 /* ─── View Transitions ─────────────────────────────────────────────── */
 ::view-transition-old(root),
 ::view-transition-new(root) {
