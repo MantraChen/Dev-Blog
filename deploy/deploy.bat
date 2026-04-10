@@ -36,6 +36,13 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+REM Push DB schema changes
+call npx drizzle-kit push --force
+if %errorlevel% neq 0 (
+    echo [%date% %time%] drizzle-kit push failed
+    exit /b 1
+)
+
 REM Restart the blog service
 nssm restart dev-blog
 if %errorlevel% neq 0 (

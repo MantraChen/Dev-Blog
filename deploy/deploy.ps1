@@ -36,6 +36,12 @@ $output = & npm run build 2>&1 | Out-String
 Write-Output $output
 if ($LASTEXITCODE -ne 0) { Log "build failed"; exit 1 }
 
+# Push DB schema changes
+Log "drizzle-kit push..."
+$output = & npx drizzle-kit push --force 2>&1 | Out-String
+Write-Output $output
+if ($LASTEXITCODE -ne 0) { Log "drizzle-kit push failed"; exit 1 }
+
 # Restart service
 Log "Restarting service..."
 $output = & nssm restart dev-blog 2>&1 | Out-String
