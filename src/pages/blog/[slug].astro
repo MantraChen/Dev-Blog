@@ -10,7 +10,7 @@ const { slug } = Astro.params
 const post = await getPostBySlug(slug!)
 
 if (!post || post.draft) {
-  return Astro.redirect("/blog")
+  return Astro.redirect("/404")
 }
 
 // 记录浏览量并获取计数和前后文章

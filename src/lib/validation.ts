@@ -31,6 +31,7 @@ export const createPostSchema = z.object({
   tags: z.array(z.string().max(50)).max(20).default([]),
   featured: z.boolean().default(false),
   draft: z.boolean().default(true),
+  hidden: z.boolean().default(false),
   publishedAt: z.string().max(50).default(() => new Date().toISOString()),
 });
 

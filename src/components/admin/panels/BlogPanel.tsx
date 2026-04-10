@@ -77,6 +77,7 @@ export function BlogPanel() {
       tags: (fd.get("tags") as string).split(",").map((s) => s.trim()).filter(Boolean),
       featured: fd.get("featured") === "on",
       draft: fd.get("draft") === "on",
+      hidden: fd.get("hidden") === "on",
       publishedAt: (fd.get("publishedAt") as string) || new Date().toISOString(),
       coverImage: coverImage || null,
     };
@@ -255,6 +256,10 @@ export function BlogPanel() {
               <input name="featured" type="checkbox" defaultChecked={editing?.featured || false} />
               Featured
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input name="hidden" type="checkbox" defaultChecked={editing?.hidden || false} />
+              Hidden
+            </label>
           </div>
 
           <div>
@@ -312,7 +317,7 @@ export function BlogPanel() {
               <tr key={p.id} className="border-b">
                 <td className="py-2 font-medium">{p.title}</td>
                 <td className="py-2 text-muted-foreground font-mono text-xs">{p.slug}</td>
-                <td className="py-2">
+                <td className="py-2 space-x-1">
                   <button
                     onClick={() => toggleDraft(p)}
                     className={`text-xs px-2 py-0.5 rounded-full ${
@@ -323,11 +328,16 @@ export function BlogPanel() {
                   >
                     {p.draft ? "Draft" : "Published"}
                   </button>
+                  {p.hidden && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/30">
+                      Hidden
+                    </span>
+                  )}
                 </td>
                 <td className="py-2 text-muted-foreground text-xs">{p.publishedAt?.split("T")[0]}</td>
                 <td className="py-2 text-right space-x-2">
                   {!p.draft && (
-                    <a href={`/blog/${p.slug}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 rounded border hover:bg-accent inline-block">View</a>
+                    <a href={`/blog/${p.slug}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 rounded border hover:bg-accent inline-block">{p.hidden ? "Direct Link" : "View"}</a>
                   )}
                   <button onClick={() => startEdit(p)} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
                   <button onClick={() => remove(p.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>

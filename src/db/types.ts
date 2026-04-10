@@ -82,6 +82,7 @@ export interface PostItem {
   series: string | null;
   featured: boolean;
   draft: boolean;
+  hidden: boolean;
   publishedAt: string;
   updatedAt: string | null;
 }

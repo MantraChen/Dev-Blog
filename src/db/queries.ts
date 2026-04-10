@@ -148,11 +148,12 @@ export async function getPublishedPosts(): Promise<PostItem[]> {
       series: posts.series,
       featured: posts.featured,
       draft: posts.draft,
+      hidden: posts.hidden,
       publishedAt: posts.publishedAt,
       updatedAt: posts.updatedAt,
     })
     .from(posts)
-    .where(eq(posts.draft, false))
+    .where(and(eq(posts.draft, false), eq(posts.hidden, false)))
     .orderBy(desc(posts.publishedAt));
 }
 
@@ -169,6 +170,7 @@ export async function getAllPosts(): Promise<PostItem[]> {
       series: posts.series,
       featured: posts.featured,
       draft: posts.draft,
+      hidden: posts.hidden,
       publishedAt: posts.publishedAt,
       updatedAt: posts.updatedAt,
     })
@@ -190,6 +192,7 @@ export async function searchPosts(query: string): Promise<PostItem[]> {
       series: posts.series,
       featured: posts.featured,
       draft: posts.draft,
+      hidden: posts.hidden,
       publishedAt: posts.publishedAt,
       updatedAt: posts.updatedAt,
     })
@@ -197,6 +200,7 @@ export async function searchPosts(query: string): Promise<PostItem[]> {
     .where(
       and(
         eq(posts.draft, false),
+        eq(posts.hidden, false),
         or(
           like(posts.title, pattern),
           like(posts.description, pattern),
@@ -211,7 +215,7 @@ export async function getAdjacentPosts(slug: string): Promise<{ prev: Pick<PostI
   const published = await db
     .select({ slug: posts.slug, title: posts.title, publishedAt: posts.publishedAt })
     .from(posts)
-    .where(eq(posts.draft, false))
+    .where(and(eq(posts.draft, false), eq(posts.hidden, false)))
     .orderBy(desc(posts.publishedAt));
 
   const idx = published.findIndex((p) => p.slug === slug);
@@ -234,6 +238,7 @@ export async function getPostBySlug(slug: string): Promise<PostItem | null> {
       series: posts.series,
       featured: posts.featured,
       draft: posts.draft,
+      hidden: posts.hidden,
       publishedAt: posts.publishedAt,
       updatedAt: posts.updatedAt,
     })

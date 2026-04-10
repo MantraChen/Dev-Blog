@@ -73,6 +73,7 @@ export const posts = sqliteTable("posts", {
   featured: int({ mode: "boolean" }).notNull().default(false),
   series: text(),
   draft: int({ mode: "boolean" }).notNull().default(true),
+  hidden: int({ mode: "boolean" }).notNull().default(false),
   publishedAt: text()
     .notNull()
     .default(sql`(datetime('now'))`),
