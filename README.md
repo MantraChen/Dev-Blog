@@ -9,7 +9,7 @@ A personal technical blog built with Astro 6 SSR, deployed on Windows Server 202
 - **Styling**: Tailwind CSS v4 + custom design tokens
 - **Content**: Markdown blog posts stored in SQLite, rendered server-side via `marked` with highlight.js code highlighting and KaTeX math rendering
 - **Islands**: React 19 (minimal client JS — TagFilter with search, ThemeToggle, AdminApp)
-- **Comments**: Giscus (GitHub Discussions)
+- **Comments**: Giscus (GitHub Discussions) with automatic dark/light theme sync
 - **Deployment**: Windows Server 2022 + Caddy (auto HTTPS) + NSSM (service manager)
 
 ## Features
@@ -24,21 +24,25 @@ A personal technical blog built with Astro 6 SSR, deployed on Windows Server 202
 - Emoji reactions per post
 - Previous/next post navigation
 - Reading progress bar and TOC sidebar (desktop sidebar + mobile drawer)
-- Giscus comment system
+- Giscus comment system with theme sync via MutationObserver
 - Archive page (posts grouped by year/month)
+- **Hidden posts**: unlisted from all listings (blog, archive, search, RSS, sitemap) but accessible via direct link
+- **404 redirect**: invalid blog slugs redirect to the 404 page
 
 ### Content Management
 - **Project showcase, skills overview, career timeline, blogroll (friends)** — all backed by SQLite
 - **Admin panel**: Session-based auth (bcrypt + HttpOnly cookies), 7 tabs — Blog, Projects, Statuses, Skills, Timeline, Friends, Stats
+- **Blog status cycle**: Draft (yellow) → Published (green) → Hidden (purple) — single-click toggle in admin
 - **Stats dashboard**: Total views, top posts ranking, daily views bar chart (last 30 days)
 
 ### UI & Responsive
 - Fully responsive mobile-first design with Tailwind CSS breakpoints
 - Mobile hamburger menu with smooth slide-down animation and outside-click-to-close
 - Dynamic favicon that follows dark/light theme switching
-- Smooth theme transition animation (0.3s ease on background, text, borders)
+- Smooth theme transition animation (optimized for performance — transitions only on key layout elements)
 - Interactive 404 page with canvas black hole animation (cursor-following, debris spaghettification, dodge button easter egg)
 - Hero entrance animations, scroll reveal effects, View Transitions
+- Skills page with auto-width labels (no truncation regardless of name length)
 
 ### Security
 - Caddy reverse proxy with security response headers (CSP, X-Frame-Options, HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
@@ -52,12 +56,14 @@ A personal technical blog built with Astro 6 SSR, deployed on Windows Server 202
 - Strict ID parameter parsing on all API routes
 - Cache-Control: no-store on all authenticated API responses
 - SQLite database not accessible via HTTP
+- Git history cleaned of sensitive files (database, credentials)
 - Windows Server hardened: non-standard RDP port, account lockout policy, unnecessary services disabled, firewall restricted to 80/443/RDP only
 
 ### Performance & SEO
 - SSR cache headers on all public pages (Cache-Control + stale-while-revalidate)
 - RSS feed, sitemap, SEO meta/OG tags
 - Dark mode with smooth transition, View Transitions, scroll reveal animations
+- Automatic DB schema migration on deploy via drizzle-kit push
 
 ## Project Structure
 
@@ -78,7 +84,7 @@ src/
     blog/                # Blog list + [slug] detail
     projects/            # Project showcase
     admin/               # Login + admin panel
-    skills.astro         # Skills/tech stack
+    skills.astro         # Skills/tech stack (auto-width labels)
     timeline.astro       # Career timeline
     archive.astro        # Posts archive by year/month
     friends.astro        # Blogroll / friend links
@@ -102,6 +108,7 @@ Deployed on Windows Server 2022 Datacenter (2C2G) with:
 - **NSSM** registering Node as a Windows service (auto-restart, boot start)
 - **Caddy** as reverse proxy (auto HTTPS via Let's Encrypt, security headers)
 - **Firewall**: only ports 80, 443, and custom RDP port open
+- **Auto-deploy**: GitHub webhook triggers `git pull` + `npm install` + `npm run build` + `drizzle-kit push` + service restart
 
 ### Deploy / Update
 
@@ -109,7 +116,8 @@ Deployed on Windows Server 2022 Datacenter (2C2G) with:
 cd C:\sites\dev-blog
 git pull
 npm install
-.\node_modules\.bin\astro.cmd build
+npx drizzle-kit push --force
+npm run build
 nssm restart dev-blog
 ```
 
