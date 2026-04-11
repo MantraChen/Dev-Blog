@@ -114,15 +114,28 @@ export function BlogPanel() {
     }
   };
 
-  const toggleDraft = async (post: any) => {
+  const cycleStatus = async (post: any) => {
+    // Draft → Published → Hidden → Draft
+    let update: { draft: boolean; hidden: boolean };
+    let message: string;
+    if (post.draft) {
+      update = { draft: false, hidden: false };
+      message = "Post published";
+    } else if (!post.hidden) {
+      update = { draft: false, hidden: true };
+      message = "Post hidden (direct link only)";
+    } else {
+      update = { draft: true, hidden: false };
+      message = "Post moved to drafts";
+    }
     try {
       const res = await fetch(`/api/posts/${post.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft: !post.draft }),
+        body: JSON.stringify(update),
       });
       if (!res.ok) throw new Error();
-      toast.success(post.draft ? "Post published" : "Post moved to drafts");
+      toast.success(message);
       load();
     } catch {
       toast.error("Failed to update status");
@@ -317,22 +330,19 @@ export function BlogPanel() {
               <tr key={p.id} className="border-b">
                 <td className="py-2 font-medium">{p.title}</td>
                 <td className="py-2 text-muted-foreground font-mono text-xs">{p.slug}</td>
-                <td className="py-2 space-x-1">
+                <td className="py-2">
                   <button
-                    onClick={() => toggleDraft(p)}
+                    onClick={() => cycleStatus(p)}
                     className={`text-xs px-2 py-0.5 rounded-full ${
                       p.draft
                         ? "bg-amber-500/10 text-amber-500 border border-amber-500/30"
+                        : p.hidden
+                        ? "bg-purple-500/10 text-purple-500 border border-purple-500/30"
                         : "bg-green-500/10 text-green-500 border border-green-500/30"
                     }`}
                   >
-                    {p.draft ? "Draft" : "Published"}
+                    {p.draft ? "Draft" : p.hidden ? "Hidden" : "Published"}
                   </button>
-                  {p.hidden && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/30">
-                      Hidden
-                    </span>
-                  )}
                 </td>
                 <td className="py-2 text-muted-foreground text-xs">{p.publishedAt?.split("T")[0]}</td>
                 <td className="py-2 text-right space-x-2">
