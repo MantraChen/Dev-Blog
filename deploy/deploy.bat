@@ -23,7 +23,7 @@ if %errorlevel% neq 0 (
 echo [%date% %time%] git pull success
 
 REM Install dependencies (in case package.json changed)
-call npm install --omit=none
+call npm install
 if %errorlevel% neq 0 (
     echo [%date% %time%] npm install failed
     exit /b 1
