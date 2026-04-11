@@ -8,7 +8,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
 export default defineConfig({
-  site: 'https://example.com', // TODO: replace with your actual domain
+  site: 'https://howielog.com',
   output: 'server',
   adapter: node({
     mode: 'standalone',
