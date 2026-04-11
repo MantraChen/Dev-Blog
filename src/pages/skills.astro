@@ -29,7 +29,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=3600, stale-while-r
           <div class="grid gap-3">
             {items.map((skill) => (
               <div class="flex items-center gap-4">
-                <span class="text-xs sm:text-sm font-medium w-36 sm:w-48 shrink-0" title={skill.name}>{skill.name}</span>
+                <span class="text-xs sm:text-sm font-medium shrink-0 whitespace-nowrap">{skill.name}</span>
                 <div class="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
                   <div
                     class="h-full rounded-full bg-primary transition-all"

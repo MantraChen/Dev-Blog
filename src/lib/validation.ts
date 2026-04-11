@@ -35,7 +35,23 @@ export const createPostSchema = z.object({
   publishedAt: z.string().max(50).default(() => new Date().toISOString()),
 });
 
-export const updatePostSchema = createPostSchema.partial();
+export const updatePostSchema = z.object({
+  title: z.string().min(1).max(200),
+  slug: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
+  description: z.string().max(500),
+  coverImage: httpUrl.nullable(),
+  series: z.string().max(100).nullable(),
+  content: z.string().max(500_000),
+  tags: z.array(z.string().max(50)).max(20),
+  featured: z.boolean(),
+  draft: z.boolean(),
+  hidden: z.boolean(),
+  publishedAt: z.string().max(50),
+}).partial();
 
 // ─── Projects ───────────────────────────────────────────────────────
 

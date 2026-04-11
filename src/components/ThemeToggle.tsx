@@ -18,6 +18,15 @@ export function ThemeToggle() {
     setTimeout(() => {
       document.documentElement.classList.remove("theme-transition");
     }, 350);
+
+    // Sync Giscus theme
+    const giscusFrame = document.querySelector<HTMLIFrameElement>("iframe.giscus-frame");
+    if (giscusFrame?.contentWindow) {
+      giscusFrame.contentWindow.postMessage(
+        { giscus: { setConfig: { theme: nextTheme === "dark" ? "dark" : "light" } } },
+        "https://giscus.app"
+      );
+    }
   };
 
   return (
