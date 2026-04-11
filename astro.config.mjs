@@ -10,6 +10,9 @@ import rehypeKatex from 'rehype-katex';
 export default defineConfig({
   site: 'https://howielog.com',
   output: 'server',
+  security: {
+    checkOrigin: false,
+  },
   adapter: node({
     mode: 'standalone',
   }),
