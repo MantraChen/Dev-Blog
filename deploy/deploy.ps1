@@ -26,7 +26,7 @@ Log "git pull success"
 
 # Install dependencies
 Log "npm install..."
-$output = & npm install --production=false 2>&1 | Out-String
+$output = & npm install --omit=none 2>&1 | Out-String
 Write-Output $output
 if ($LASTEXITCODE -ne 0) { Log "npm install failed"; exit 1 }
 

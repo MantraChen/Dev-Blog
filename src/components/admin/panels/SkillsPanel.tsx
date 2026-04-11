@@ -48,7 +48,8 @@ export function SkillsPanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this skill?")) return;
     try {
-      await fetch(`/api/skills/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/skills/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
       toast.success("Skill deleted");
       load();
     } catch {

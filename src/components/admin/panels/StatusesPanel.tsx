@@ -38,7 +38,8 @@ export function StatusesPanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this status?")) return;
     try {
-      await fetch(`/api/statuses/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/statuses/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
       toast.success("Status deleted");
       load();
     } catch {

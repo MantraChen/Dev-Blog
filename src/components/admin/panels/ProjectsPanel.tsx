@@ -49,7 +49,8 @@ export function ProjectsPanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this project?")) return;
     try {
-      await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
       toast.success("Project deleted");
       load();
     } catch {

@@ -48,7 +48,8 @@ export function FriendsPanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this friend link?")) return;
     try {
-      await fetch(`/api/friends/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/friends/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
       toast.success("Friend deleted");
       load();
     } catch {

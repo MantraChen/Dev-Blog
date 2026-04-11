@@ -50,7 +50,8 @@ export function TimelinePanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this entry?")) return;
     try {
-      await fetch(`/api/timeline/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/timeline/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
       toast.success("Entry deleted");
       load();
     } catch {
@@ -75,7 +76,7 @@ export function TimelinePanel() {
           <input name="title" placeholder="Title" defaultValue={editing?.title || ""} required className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm" />
           <textarea name="description" placeholder="Description" defaultValue={editing?.description || ""} required className="flex min-h-[80px] w-full rounded-md border bg-transparent px-3 py-2 text-sm" />
           <div className="flex gap-3">
-            <select name="type" defaultValue={editing?.type || "career"} className="flex h-9 rounded-md border bg-transparent px-3 text-sm">
+            <select name="type" defaultValue={editing?.type || "career"} className="flex h-9 rounded-md border bg-background text-foreground px-3 text-sm [&>option]:bg-background [&>option]:text-foreground">
               <option value="career">Career</option>
               <option value="education">Education</option>
               <option value="milestone">Milestone</option>
