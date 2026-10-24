@@ -88,7 +88,7 @@ export const posts = sqliteTable("posts", {
   createdAt: text()
     .notNull()
     .default(sql`(datetime('now'))`),
-});
+}, (table) => [index("posts_public_date").on(table.draft, table.hidden, table.publishedAt, table.id)]);
 
 // ─── Friends (Blogroll) ──────────────────────────────────────────────
 export const friends = sqliteTable("friends", {

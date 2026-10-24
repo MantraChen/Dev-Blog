@@ -1,9 +1,9 @@
 import rss from "@astrojs/rss";
-import { getPublishedPosts } from "@/db/queries";
+import { getPublishedPostMetadata } from "@/db/queries";
 import type { APIContext } from "astro";
 
 export async function GET(context: APIContext) {
-  const posts = await getPublishedPosts();
+  const posts = await getPublishedPostMetadata();
 
   const response = await rss({
     title: "Howie Sun | Tech Blog",

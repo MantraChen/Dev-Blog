@@ -1,9 +1,9 @@
 import type { APIRoute } from "astro";
-import { getPublishedPosts } from "@/db/queries";
+import { getPublishedPostMetadata } from "@/db/queries";
 
 export const GET: APIRoute = async ({ site }) => {
   const baseUrl = site?.toString().replace(/\/$/, "") || "https://example.com";
-  const posts = await getPublishedPosts();
+  const posts = await getPublishedPostMetadata();
 
   const staticPages = [
     { url: "/", priority: "1.0" },

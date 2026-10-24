@@ -30,6 +30,11 @@ const migrations = [{
       CREATE INDEX IF NOT EXISTS post_views_created ON post_views(createdAt);
       CREATE INDEX IF NOT EXISTS reactions_post_emoji ON reactions(postId, emoji);`);
   },
+}, {
+  id: "003-public-post-index",
+  up(db) {
+    db.exec("CREATE INDEX IF NOT EXISTS posts_public_date ON posts(draft, hidden, publishedAt, id)");
+  },
 }];
 
 export function pendingMigrations(db) {

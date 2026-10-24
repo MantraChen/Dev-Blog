@@ -6,20 +6,24 @@ interface Props {
   posts: PostSummary[];
   tags: string[];
   tagCounts: Record<string, number>;
+  initialQuery: string; initialTag: string; initialPage: number; initialTotal: number;
 }
 
-export function TagFilter({ posts, tags, tagCounts }: Props) {
-  const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+export function TagFilter({ posts, tags, tagCounts, initialQuery, initialTag, initialPage, initialTotal }: Props) {
+  const [activeTag, setActiveTag] = useState<string | null>(initialTag || null);
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [searchResults, setSearchResults] = useState<PostSummary[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
+  const [page, setPage] = useState(initialPage);
+  const [total, setTotal] = useState(initialTotal);
   useEffect(() => {
     const query = searchQuery.trim();
     setSearchError(null);
-    if (query.length < 2) {
+    if (query === initialQuery && (activeTag || "") === initialTag && page === initialPage) {
       setSearchResults(null);
+      setTotal(initialTotal);
       setIsSearching(false);
       return;
     }
@@ -27,10 +31,13 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
     setIsSearching(true);
     const timer = setTimeout(async () => {
         try {
-          const res = await fetch(`/api/posts/search?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+          const res = await fetch(`/api/posts/search?${new URLSearchParams({ q: query, tag: activeTag || "", page: String(page) })}`, { signal: controller.signal });
           if (!res.ok) throw new Error(res.status === 429 ? "Too many searches. Please try again shortly." : "Search failed. Please try again.");
           const data: PostSummary[] = await res.json();
-          if (!controller.signal.aborted) setSearchResults(data);
+          if (!controller.signal.aborted) {
+            setSearchResults(data);
+            setTotal(Number(res.headers.get("X-Total-Count")) || 0);
+          }
         } catch (error) {
           if (!controller.signal.aborted) {
             setSearchResults([]);
@@ -42,26 +49,30 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
     }, 300);
 
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [searchQuery]);
+  }, [searchQuery, activeTag, page, initialQuery, initialTag, initialPage, initialTotal]);
 
-  const candidates = searchResults ?? posts;
-  const displayPosts = activeTag ? candidates.filter((p) => p.tags.includes(activeTag)) : candidates;
+  const displayPosts = searchResults ?? posts;
+  const pageUrl = (number: number) => `/blog?${new URLSearchParams({ q: searchQuery.trim(), tag: activeTag || "", page: String(number) })}`;
 
   return (
     <div>
+      <form action="/blog" method="get" onSubmit={e => e.preventDefault()}>
+      {activeTag && <input type="hidden" name="tag" value={activeTag} />}
       <input
+        name="q"
         type="text"
         placeholder="Search posts..."
         aria-label="Search posts"
         maxLength={200}
         value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
+        onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
         className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 mb-6"
       />
+      </form>
 
         <div className="flex flex-wrap gap-2 mb-8">
           <button
-            onClick={() => setActiveTag(null)}
+            onClick={() => { setActiveTag(null); setPage(1); }}
             aria-pressed={activeTag === null}
             className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold transition-colors ${
               activeTag === null
@@ -80,7 +91,7 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
             return (
               <button
                 key={tag}
-                onClick={() => setActiveTag(tag === activeTag ? null : tag)}
+                onClick={() => { setActiveTag(tag === activeTag ? null : tag); setPage(1); }}
                 aria-pressed={activeTag === tag}
                 className={`inline-flex items-center rounded-full border px-3 py-1 transition-colors ${sizeClass} ${
                   activeTag === tag
@@ -172,6 +183,11 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
           </>
         )}
       </div>
+      {!isSearching && !searchError && total > 20 && <nav aria-label="Blog pages" className="flex items-center justify-between mt-8">
+        {page > 1 ? <a href={pageUrl(page - 1)} rel="prev">← Previous</a> : <span />}
+        <span>Page {page} of {Math.ceil(total / 20)}</span>
+        {page < Math.ceil(total / 20) ? <a href={pageUrl(page + 1)} rel="next">Next →</a> : <span />}
+      </nav>}
     </div>
   );
 }
