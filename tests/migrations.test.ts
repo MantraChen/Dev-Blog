@@ -42,6 +42,21 @@ test("migration bootstraps a fresh database and is idempotent", () => {
   } finally { db.close(); }
 });
 
+test("normalizes legacy UTC publication dates without guessing invalid values", () => {
+  const db = new Database(":memory:");
+  try {
+    db.exec(readFileSync(new URL("../migrations/001-baseline.sql", import.meta.url), "utf8"));
+    const insert = db.prepare("INSERT INTO posts(title, slug, publishedAt) VALUES ('Test', ?, ?)");
+    insert.run("late", "2026-10-25 22:00:00");
+    insert.run("early", "2026-10-25T01:00:00.000Z");
+    insert.run("invalid", "editorial correction needed");
+    migrate(db);
+    assert.equal((db.prepare("SELECT publishedAt FROM posts WHERE slug = 'late'").get() as { publishedAt: string }).publishedAt, "2026-10-25T22:00:00.000Z");
+    assert.deepEqual(db.prepare("SELECT slug FROM posts WHERE slug != 'invalid' ORDER BY publishedAt DESC").all(), [{ slug: "late" }, { slug: "early" }]);
+    assert.equal((db.prepare("SELECT publishedAt FROM posts WHERE slug = 'invalid'").get() as { publishedAt: string }).publishedAt, "editorial correction needed");
+  } finally { db.close(); }
+});
+
 test("adopts the old Drizzle schema without dropping content", () => {
   const db = new Database(":memory:");
   try {

@@ -35,6 +35,16 @@ const migrations = [{
   up(db) {
     db.exec("CREATE INDEX IF NOT EXISTS posts_public_date ON posts(draft, hidden, publishedAt, id)");
   },
+}, {
+  id: "004-normalize-publication-dates",
+  up(db) {
+    // Old SQLite defaults use UTC with a space; newer inputs use ISO timestamps.
+    // Normalize valid dates so index ordering is chronological across both formats.
+    // Preserve invalid legacy values for explicit editorial correction.
+    for (const field of ["publishedAt", "updatedAt"]) {
+      db.exec(`UPDATE posts SET ${field} = strftime('%Y-%m-%dT%H:%M:%fZ', ${field}) WHERE strftime('%Y-%m-%dT%H:%M:%fZ', ${field}) IS NOT NULL`);
+    }
+  },
 }];
 
 export function pendingMigrations(db) {
