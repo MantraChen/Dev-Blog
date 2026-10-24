@@ -1,10 +1,9 @@
 import type { APIRoute } from "astro";
-import { getPublishedPosts, getProjectList } from "@/db/queries";
+import { getPublishedPosts } from "@/db/queries";
 
 export const GET: APIRoute = async ({ site }) => {
   const baseUrl = site?.toString().replace(/\/$/, "") || "https://example.com";
   const posts = await getPublishedPosts();
-  const projects = await getProjectList();
 
   const staticPages = [
     { url: "/", priority: "1.0" },
@@ -32,7 +31,7 @@ ${posts.map((post) => `  <url>
   return new Response(xml, {
     headers: {
       "Content-Type": "application/xml",
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": "no-cache",
     },
   });
 };

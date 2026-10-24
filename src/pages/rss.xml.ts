@@ -5,9 +5,9 @@ import type { APIContext } from "astro";
 export async function GET(context: APIContext) {
   const posts = await getPublishedPosts();
 
-  return rss({
-    title: "Dev Blog",
-    description: "Personal tech blog",
+  const response = await rss({
+    title: "Howie Sun | Tech Blog",
+    description: "Systems programming and engineering notes by Howie Sun",
     site: context.site!,
     items: posts.map((post) => ({
       title: post.title,
@@ -16,4 +16,6 @@ export async function GET(context: APIContext) {
       link: `/blog/${post.slug}/`,
     })),
   });
+  response.headers.set("Cache-Control", "no-cache");
+  return response;
 }

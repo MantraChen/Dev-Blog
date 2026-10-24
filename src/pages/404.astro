@@ -1,8 +1,10 @@
 ---
 import BaseLayout from "@/components/layout/BaseLayout.astro"
+Astro.response.status = 404
+Astro.response.headers.set("Cache-Control", "no-store")
 ---
 
-<BaseLayout title="404 | Lost in Space">
+<BaseLayout title="404 | Lost in Space" noIndex>
   <div id="bhPage" class="bh-page">
     <canvas id="space"></canvas>
 

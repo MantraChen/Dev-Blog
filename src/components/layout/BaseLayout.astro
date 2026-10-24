@@ -8,10 +8,23 @@ interface Props {
   title: string;
   description?: string;
   ogImage?: string;
+  noIndex?: boolean;
+  canonicalPath?: string;
+  article?: { publishedAt: string; updatedAt?: string | null };
 }
 
-const { title, description = "Personal Technology Blog", ogImage } = Astro.props;
-const canonicalUrl = new URL(Astro.url.pathname, Astro.site || "https://HowieLog.com/");
+const { title, description = "Systems programming, engineering experiments, and project notes by Howie Sun.", ogImage = "/icon-512.png", noIndex = false, canonicalPath, article } = Astro.props;
+const siteUrl = Astro.site || new URL("https://howielog.com/");
+const canonicalUrl = new URL(canonicalPath || Astro.url.pathname, siteUrl);
+const imageUrl = new URL(ogImage, siteUrl);
+const isoDate = (value: string) => Number.isNaN(Date.parse(value)) ? undefined : new Date(value).toISOString();
+const articleData = article && {
+  "@context": "https://schema.org", "@type": "BlogPosting", headline: title.replace(/ \| Blog$/, ""),
+  description, image: imageUrl.href, mainEntityOfPage: canonicalUrl.href,
+  author: { "@type": "Person", name: "Howie Sun", url: siteUrl.href },
+  datePublished: isoDate(article.publishedAt), dateModified: isoDate(article.updatedAt || article.publishedAt),
+};
+if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Cache-Control", "no-cache");
 ---
 
 <!doctype html>
@@ -21,18 +34,23 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site || "https://HowieLog
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" type="application/rss+xml" title="Howie Sun — RSS" href="/rss.xml" />
+    {noIndex && <meta name="robots" content="noindex, nofollow" />}
 
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={article ? "article" : "website"} />
     <meta property="og:url" content={canonicalUrl} />
-    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta property="og:image" content={imageUrl} />
+    {article && <meta property="article:published_time" content={isoDate(article.publishedAt)} />}
+    {article && <meta property="article:modified_time" content={isoDate(article.updatedAt || article.publishedAt)} />}
+    {articleData && <script is:inline type="application/ld+json" set:html={JSON.stringify(articleData).replace(/</g, "\\u003c")} />}
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
 
     <meta name="twitter:description" content={description} />
-    {ogImage && <meta name="twitter:image" content={ogImage} />}
+    <meta name="twitter:image" content={imageUrl} />
 
     <link rel="icon" id="dynamic-favicon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />

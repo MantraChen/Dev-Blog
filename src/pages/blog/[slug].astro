@@ -10,7 +10,7 @@ const { slug } = Astro.params
 const post = await getPostBySlug(slug!)
 
 if (!post || post.draft) {
-  return Astro.redirect("/404")
+  return Astro.rewrite("/404")
 }
 
 // 记录浏览量并获取计数和前后文章
@@ -40,10 +40,10 @@ const description = post.description || post.content.replace(/[#*`>\-\[\]()!{}\n
 
 const publishedDate = new Date(post.publishedAt)
 
-Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=3600')
+Astro.response.headers.set('Cache-Control', post.hidden ? 'private, no-store' : 'no-cache')
 ---
 
-<BaseLayout title={`${post.title} | Blog`} description={description}>
+<BaseLayout title={`${post.title} | Blog`} description={description} ogImage={post.coverImage || undefined} noIndex={post.hidden} article={{ publishedAt: post.publishedAt, updatedAt: post.updatedAt }}>
   <div id="reading-progress"></div>
 
   <div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 flex gap-10">
