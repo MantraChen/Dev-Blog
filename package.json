@@ -10,7 +10,10 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "check": "astro check",
+    "test": "node --import tsx --test tests/*.test.ts tests/*.test.cjs",
+    "verify": "npm run check && npm test && npm run build"
   },
   "dependencies": {
     "@astrojs/mdx": "^5.0.0",
