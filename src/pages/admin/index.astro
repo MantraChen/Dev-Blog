@@ -27,9 +27,15 @@ if (!isAuthenticated) {
 
   <script>
     import { withBase } from "@/lib/site-path";
+    import { clearEditorRecovery, BEFORE_EDITOR_LOGOUT } from "@/lib/editor-client";
     document.getElementById('logout-btn')!.addEventListener('click', async () => {
-      await fetch(withBase('/api/auth/logout'), { method: 'POST' });
-      window.location.href = withBase('/admin/login');
+      if (!window.dispatchEvent(new Event(BEFORE_EDITOR_LOGOUT, { cancelable: true }))) return;
+      try {
+        const response = await fetch(withBase('/api/auth/logout'), { method: 'POST' });
+        if (!response.ok) throw new Error('Sign out failed');
+        clearEditorRecovery();
+        window.location.href = withBase('/admin/login');
+      } catch { alert('Unable to sign out. Please retry. Your browser recovery copies are preserved.'); }
     });
   </script>
 </BaseLayout>

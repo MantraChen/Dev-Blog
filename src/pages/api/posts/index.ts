@@ -38,7 +38,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     });
   }
 
-  const result = await createPost(parsed.data);
+  const result = createPost(parsed.data);
 
   await createAuditLog({
     action: "post.create",

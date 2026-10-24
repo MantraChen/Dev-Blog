@@ -19,6 +19,8 @@ Set `ADMIN_PASSWORD_HASH` in the **server process environment** before starting 
 ## Features
 
 - Admin CRUD for posts, projects, statuses, skills, timeline and friend links.
+- A writing workspace with automatic draft saves, browser recovery, separate publication, private full-page/split previews, and the latest 30 article versions.
+- Paste, drop or select images; validated JPEG/PNG/WebP uploads become resized WebP files. Recent uploads can be reused without uploading again.
 - Markdown preview, explicit-language code highlighting, math, Unicode heading anchors, TOC and code copying.
 - Public posts paginated in groups of 20, with combined keyword search and tag filters.
 - Archives, RSS, sitemap, canonical/OG metadata and BlogPosting structured data.
@@ -26,6 +28,16 @@ Set `ADMIN_PASSWORD_HASH` in the **server process environment** before starting 
 - Anonymous views deduplicated by a keyed network identifier and 30-minute bucket; emoji reactions deduplicated per network, post and emoji during their 90-day retention window. Shared IPs can undercount; these are approximate analytics.
 - Giscus comments, locally served Geist/KaTeX fonts, dark/light themes, responsive layout and native page transitions.
 - FTS5 substring search for 3+ characters; shorter Chinese/other queries retain literal substring matching in a bounded worker, away from the HTTP event loop.
+
+## Writing workflow
+
+Create or edit an article in **Admin → Blog**. Changes save after 800 ms of inactivity into a private working draft, including incomplete titles and slugs. **Publish article / Publish changes** validates and publishes the draft atomically. Existing public content stays unchanged while you edit. **Save draft & close** keeps it in the Working drafts list; **Discard draft** leaves the published article and its history intact. The existing article Delete action is permanent, including its draft and history.
+
+Unsaved changes are also cached in this browser tab. After an interrupted connection or a refresh, reopen the same draft and choose the browser copy or the server copy. This is a recovery aid, not a backup: clearing site storage or closing a tab without restoring its session can make that copy unavailable. Save to the server before closing the browser. Signing out clears browser recovery copies; unsaved edits in the current editor require confirmation. Concurrent tabs cannot silently overwrite newer server drafts. On a conflict, download the working copy before reloading. If the published article itself changed, preserve your edits, discard the old working draft, and reopen the latest article.
+
+Version history stores the latest 30 article versions, beginning with the current version when an existing article is first opened or updated. Autosaves update the working draft rather than adding history entries. Restoring a historical version replaces the working draft; publishing is still a separate action. At most 200 working drafts are allowed.
+
+Images accept still JPEG/PNG/WebP up to 8 MiB and 16,777,216 pixels. Uploads are decoded, metadata is stripped, and the result is compressed to WebP with a maximum edge of 2048 pixels. Original files are not retained. Uploads are private until referenced by a published article; unlisted articles are still public to anyone with their link. Removing all published references revokes public access, but cannot recall copies already downloaded by visitors. Historical and unused files are retained for recovery; monitor disk usage. External image URLs retain their original host's access rules.
 
 ## Validation and CI
 
@@ -53,6 +65,8 @@ See [the environment assessment](docs/ENVIRONMENT.md) for the minimal-risk Linux
 For the shared server, see [the my_server adapter](deploy/my-server/README.md). Build with `SITE_URL=https://dyyjs.com` and `PUBLIC_BASE_PATH=/howielog` to serve the complete blog at `https://dyyjs.com/howielog/`. Both settings are build-time values; changing them requires rebuilding. Omitting them preserves the standalone `https://howielog.com/` deployment. CI tests both layouts on Linux and Windows.
 
 Deployment builds a new release with `npm ci` and verifies it before stopping the running service. It backs up and migrates SQLite, switches NSSM, checks the exact release and restores the previous service configuration on failure. Old releases and backups are retained for recovery; monitor their disk usage.
+
+Migration `007-writing-workflow.sql` adds working drafts, revision history and image metadata. Uploaded files live in `MEDIA_DIR`, defaulting to a `media` directory beside `DATABASE_PATH`. Production must use an absolute persistent path writable by the service account, outside release directories. **Back up both SQLite and the media directory**: existing deployment/migration backups cover SQLite only. Pause writes, take the SQLite backup and copy the media directory as one recovery set; test restoring both. Keep new media files during code rollback and do not expose the directory through a static Caddy/file-server route, which would bypass draft-image authentication.
 
 Never use `drizzle-kit push --force` against production. Add versioned migrations to `scripts/migrate.mjs`; keep applied migrations immutable. Existing historical Drizzle SQL files are retained for baseline adoption and regression tests.
 

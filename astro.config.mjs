@@ -38,7 +38,7 @@ export default defineConfig({
   server: { host: '127.0.0.1' },
   adapter: node({
     mode: 'standalone',
-    bodySizeLimit: 1024 * 1024,
+    bodySizeLimit: 8 * 1024 * 1024,
   }),
   integrations: [react()],
   vite: {

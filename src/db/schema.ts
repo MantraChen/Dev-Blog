@@ -71,6 +71,7 @@ export const postViews = sqliteTable("post_views", {
 // ─── Posts ───────────────────────────────────────────────────────────
 export const posts = sqliteTable("posts", {
   id: int().primaryKey({ autoIncrement: true }),
+  version: int().notNull().default(1),
   title: text().notNull(),
   slug: text().notNull().unique(),
   description: text().notNull().default(""),

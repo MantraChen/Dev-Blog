@@ -1,356 +1,81 @@
-import { withBase, contentUrl } from "@/lib/site-path";
-import React, { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { slugifyPostTitle } from "@/lib/post-slug";
+import { withBase } from "@/lib/site-path";
+import { editorRequest } from "@/lib/editor-client";
+import type { EditorDraft, DraftSummary } from "@/lib/editor-data";
+import type { PostItem } from "@/db/types";
+import { WritingEditor } from "../WritingEditor";
+
+const button = "rounded border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50";
 
 export function BlogPanel() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [items, setItems] = useState<any[]>([]);
-  const [editing, setEditing] = useState<any | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [preview, setPreview] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState("");
-  const [content, setContent] = useState("");
-  const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [autoSlug, setAutoSlug] = useState(true);
-  const [fallbackSlug, setFallbackSlug] = useState("");
-  const [coverImage, setCoverImage] = useState("");
-
+  const [posts, setPosts] = useState<PostItem[]>([]);
+  const [drafts, setDrafts] = useState<DraftSummary[]>([]);
+  const [editor, setEditor] = useState<EditorDraft | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const load = useCallback(async () => {
     try {
-      const res = await fetch(withBase("/api/posts"));
-      if (res.ok) setItems(await res.json());
-      else toast.error("Failed to fetch posts");
-    } catch {
-      toast.error("Network error");
-    } finally {
-      setIsLoading(false);
-    }
+      const [articles, working] = await Promise.all([
+        editorRequest<PostItem[]>("/api/posts"), editorRequest<DraftSummary[]>("/api/editor/drafts"),
+      ]);
+      setPosts(articles); setDrafts(working); setError("");
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not load articles"); }
+    finally { setLoading(false); }
   }, []);
+  useEffect(() => { void load(); }, [load]);
 
-  useEffect(() => { load(); }, [load]);
-
-  // Auto-generate slug from title
-  useEffect(() => {
-    if (autoSlug && !editing) {
-      setSlug(title ? slugifyPostTitle(title, fallbackSlug) : "");
-    }
-  }, [title, autoSlug, editing, fallbackSlug]);
-
-  const startEdit = (post: any) => {
-    setEditing(post);
-    setTitle(post.title);
-    setSlug(post.slug);
-    setContent(post.content);
-    setAutoSlug(false);
-    setCoverImage(post.coverImage || "");
-    setShowForm(true);
-    setPreview(false);
-  };
-
-  const startNew = () => {
-    setFallbackSlug(`post-${crypto.randomUUID()}`);
-    setEditing(null);
-    setTitle("");
-    setSlug("");
-    setContent("");
-    setAutoSlug(true);
-    setCoverImage("");
-    setShowForm(!showForm);
-    setPreview(false);
-  };
-
-  const save = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const body = {
-      title,
-      slug,
-      description: fd.get("description") as string,
-      content,
-      tags: (fd.get("tags") as string).split(",").map((s) => s.trim()).filter(Boolean),
-      featured: fd.get("featured") === "on",
-      draft: fd.get("draft") === "on",
-      hidden: fd.get("hidden") === "on",
-      publishedAt: (fd.get("publishedAt") as string) || new Date().toISOString(),
-      coverImage: coverImage || null,
-    };
-
+  async function open(postId?: number, draftId?: string) {
+    setBusy(true);
     try {
-      const res = await fetch(withBase(editing ? `/api/posts/${editing.id}` : "/api/posts"), {
-        method: editing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || "Failed to save post");
-      toast.success(editing ? "Post updated successfully" : "Post created successfully");
-      setEditing(null);
-      setShowForm(false);
-      setContent("");
-      setTitle("");
-      setSlug("");
-      setCoverImage("");
-      load();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save post");
-    }
-  };
-
-  const remove = async (id: number) => {
-    if (!confirm("Delete this post?")) return;
+      const draft = draftId ? await editorRequest<EditorDraft>(`/api/editor/drafts/${draftId}`)
+        : await editorRequest<EditorDraft>("/api/editor/drafts", "POST", { id: crypto.randomUUID(), ...(postId ? { postId } : {}) });
+      setEditor(draft);
+    } catch (failure) { toast.error(failure instanceof Error ? failure.message : "Could not open editor"); }
+    finally { setBusy(false); }
+  }
+  async function cycleStatus(post: PostItem) {
+    const next = post.draft ? { draft: false, hidden: false } : !post.hidden ? { draft: false, hidden: true } : { draft: true, hidden: false };
     try {
-      const res = await fetch(withBase(`/api/posts/${id}`), { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      toast.success("Post deleted");
-      load();
-    } catch {
-      toast.error("Failed to delete post");
-    }
-  };
+      await editorRequest(`/api/posts/${post.id}`, "PUT", next);
+      await load();
+    } catch (failure) { toast.error(failure instanceof Error ? failure.message : "Could not change visibility"); }
+  }
+  async function remove(post: PostItem) {
+    if (!confirm(`Permanently delete “${post.title}”, its working draft and version history?`)) return;
+    try { await editorRequest(`/api/posts/${post.id}`, "DELETE"); await load(); }
+    catch (failure) { toast.error(failure instanceof Error ? failure.message : "Could not delete article"); }
+  }
 
-  const cycleStatus = async (post: any) => {
-    // Draft → Published → Hidden → Draft
-    let update: { draft: boolean; hidden: boolean };
-    let message: string;
-    if (post.draft) {
-      update = { draft: false, hidden: false };
-      message = "Post published";
-    } else if (!post.hidden) {
-      update = { draft: false, hidden: true };
-      message = "Post hidden (direct link only)";
-    } else {
-      update = { draft: true, hidden: false };
-      message = "Post moved to drafts";
-    }
-    try {
-      const res = await fetch(withBase(`/api/posts/${post.id}`), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(update),
-      });
-      if (!res.ok) throw new Error();
-      toast.success(message);
-      load();
-    } catch {
-      toast.error("Failed to update status");
-    }
-  };
-
-  useEffect(() => {
-    if (!preview) return;
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(withBase("/api/posts/preview"), {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }), signal: controller.signal,
-        });
-        if (!res.ok) throw new Error("Preview failed");
-        const { html } = await res.json();
-        if (!controller.signal.aborted) setPreviewHtml(html);
-      } catch {
-        if (!controller.signal.aborted) setPreviewHtml('<p class="text-destructive">Preview rendering failed</p>');
-      }
-    }, 300);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [preview, content]);
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Blog Posts</h2>
-        <button
-          onClick={startNew}
-          className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          {showForm ? "Cancel" : "New Post"}
-        </button>
-      </div>
-
-      {showForm && (
-        <form onSubmit={save} className="border rounded-lg p-4 mb-6 space-y-3">
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground">Title</label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Post title"
-                required
-                className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground">
-                Slug
-                {!editing && (
-                  <button
-                    type="button"
-                    onClick={() => setAutoSlug(!autoSlug)}
-                    className="ml-2 text-[10px] text-muted-foreground/60 hover:text-muted-foreground"
-                  >
-                    [{autoSlug ? "auto" : "manual"}]
-                  </button>
-                )}
-              </label>
-              <input
-                value={slug}
-                onChange={(e) => { setSlug(e.target.value); setAutoSlug(false); }}
-                placeholder="post-url-slug"
-                required
-                className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm font-mono"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs text-muted-foreground">Description</label>
-            <input
-              name="description"
-              placeholder="Brief description (for SEO/previews)"
-              defaultValue={editing?.description || ""}
-              className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-muted-foreground">Cover Image URL</label>
-            <div className="flex gap-2">
-              <input
-                value={coverImage}
-                onChange={(e) => setCoverImage(e.target.value)}
-                placeholder="https://example.com/image.jpg"
-                className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-              />
-              {coverImage && (
-                <button
-                  type="button"
-                  onClick={() => setCoverImage("")}
-                  className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10 shrink-0"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {coverImage && (
-              <div className="mt-2 rounded-md overflow-hidden border">
-                <img src={contentUrl(coverImage)} alt="Cover preview" className="w-full h-32 object-cover" />
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground">Tags (comma separated)</label>
-              <input name="tags" placeholder="rust, concurrency" defaultValue={editing?.tags?.join(", ") || ""} className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Published date</label>
-              <input name="publishedAt" type="date" defaultValue={editing?.publishedAt?.split("T")[0] || new Date().toISOString().split("T")[0]} className="flex h-9 rounded-md border bg-transparent px-3 text-sm" />
-            </div>
-          </div>
-
-          <div className="flex gap-4 items-center">
-            <label className="flex items-center gap-2 text-sm">
-              <input name="draft" type="checkbox" defaultChecked={editing ? editing.draft : true} />
-              Draft
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input name="featured" type="checkbox" defaultChecked={editing?.featured || false} />
-              Featured
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input name="hidden" type="checkbox" defaultChecked={editing?.hidden || false} />
-              Hidden
-            </label>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs text-muted-foreground">Content (Markdown)</label>
-              <button
-                type="button"
-                onClick={() => setPreview(!preview)}
-                className="text-xs px-2 py-0.5 rounded border hover:bg-accent"
-              >
-                {preview ? "Edit" : "Preview"}
-              </button>
-            </div>
-            {preview ? (
-              <div className="min-h-[300px] max-h-[500px] overflow-auto rounded-md border p-4 prose prose-sm prose-zinc dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: previewHtml }} />
-            ) : (
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Write your post in Markdown..."
-                className="flex min-h-[300px] w-full rounded-md border bg-transparent px-3 py-2 text-sm font-mono leading-relaxed"
-              />
-            )}
-          </div>
-
-          <button type="submit" className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
-            {editing ? "Update" : "Create"}
-          </button>
-        </form>
-      )}
-
-      {isLoading ? (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex gap-4 items-center">
-              <div className="h-4 bg-muted rounded animate-pulse flex-1" />
-              <div className="h-4 bg-muted rounded animate-pulse w-24" />
-              <div className="h-4 bg-muted rounded animate-pulse w-16" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b">
-              <th className="text-left py-2 font-medium">Title</th>
-              <th className="text-left py-2 font-medium">Slug</th>
-              <th className="text-left py-2 font-medium">Status</th>
-              <th className="text-left py-2 font-medium">Date</th>
-              <th className="text-right py-2 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((p) => (
-              <tr key={p.id} className="border-b">
-                <td className="py-2 font-medium">{p.title}</td>
-                <td className="py-2 text-muted-foreground font-mono text-xs">{p.slug}</td>
-                <td className="py-2">
-                  <button
-                    onClick={() => cycleStatus(p)}
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      p.draft
-                        ? "bg-amber-500/10 text-amber-500 border border-amber-500/30"
-                        : p.hidden
-                        ? "bg-purple-500/10 text-purple-500 border border-purple-500/30"
-                        : "bg-green-500/10 text-green-500 border border-green-500/30"
-                    }`}
-                  >
-                    {p.draft ? "Draft" : p.hidden ? "Hidden" : "Published"}
-                  </button>
-                </td>
-                <td className="py-2 text-muted-foreground text-xs">{p.publishedAt?.split("T")[0]}</td>
-                <td className="py-2 text-right space-x-2">
-                  {!p.draft && (
-                    <a href={withBase(`/blog/${p.slug}`)} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 rounded border hover:bg-accent inline-block">{p.hidden ? "Direct Link" : "View"}</a>
-                  )}
-                  <button onClick={() => startEdit(p)} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
-                  <button onClick={() => remove(p.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {!isLoading && items.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-8">No posts yet. Create your first one above.</p>
-      )}
+  if (editor) return <WritingEditor key={editor.id} initial={editor} onClose={() => { setEditor(null); void load(); }} />;
+  return <div className="space-y-6">
+    <div className="flex items-center justify-between gap-3">
+      <div><h2 className="text-xl font-semibold">Articles</h2><p className="mt-1 text-sm text-muted-foreground">Write privately, preview, then publish.</p></div>
+      <button className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50" disabled={busy} onClick={() => void open()}>New article</button>
     </div>
-  );
+    {error && <div role="alert" className="rounded border p-3 text-sm">{error} <button className="ml-3 underline" onClick={() => void load()}>Retry</button></div>}
+    {drafts.length > 0 && <section aria-label="Working drafts" className="rounded-lg border bg-muted/20 p-4">
+      <h3 className="mb-3 text-sm font-semibold">Working drafts</h3>
+      <div className="space-y-2">{drafts.map(draft => <div key={draft.id} className="flex flex-wrap items-center justify-between gap-2 border-t py-2 first:border-0">
+        <div className="min-w-0"><p className="truncate text-sm font-medium">{draft.title || "Untitled article"}</p><p className="text-xs text-muted-foreground">{draft.postId ? "Unpublished changes" : "New draft"} · {new Date(draft.updatedAt).toLocaleString()}</p></div>
+        <button className={button} disabled={busy} onClick={() => void open(undefined, draft.id)}>Continue writing</button>
+      </div>)}</div>
+    </section>}
+    {loading ? <p className="py-8 text-sm text-muted-foreground">Loading articles…</p> : <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="py-3 font-medium">Title</th><th className="px-3 font-medium">Visibility</th><th className="px-3 font-medium">Date</th><th className="text-right font-medium">Actions</th></tr></thead>
+        <tbody>{posts.map(post => <tr key={post.id} className="border-b">
+          <td className="py-3"><p className="font-medium">{post.title}</p><p className="font-mono text-xs text-muted-foreground">{post.slug}</p></td>
+          <td className="px-3"><button className="rounded-full border px-2 py-1 text-xs" title="Cycle visibility: draft → public → unlisted" onClick={() => void cycleStatus(post)}>{post.draft ? "Draft" : post.hidden ? "Unlisted" : "Published"}</button></td>
+          <td className="whitespace-nowrap px-3 text-xs text-muted-foreground">{post.publishedAt.slice(0, 10)}</td>
+          <td className="py-3"><div className="flex justify-end gap-2">
+            {!post.draft && <a className={button} href={withBase(`/blog/${post.slug}`)} target="_blank" rel="noreferrer">View</a>}
+            <button className={button} disabled={busy} onClick={() => void open(post.id)}>Edit</button>
+            <button className={`${button} text-destructive`} onClick={() => void remove(post)}>Delete</button>
+          </div></td>
+        </tr>)}</tbody>
+      </table>
+      {posts.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">No articles yet. Start a draft above.</p>}
+    </div>}
+  </div>;
 }

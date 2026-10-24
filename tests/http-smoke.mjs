@@ -8,6 +8,7 @@ import { once } from "node:events";
 import { createHash } from "node:crypto";
 import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
+import sharp from "sharp";
 import { migrate } from "../scripts/migrate.mjs";
 
 const directory = mkdtempSync(join(tmpdir(), "devblog-http-test-"));
@@ -35,7 +36,7 @@ const checkLocalLinks = html => {
 };
 const password = crypto.randomUUID();
 const child = spawn(process.execPath, ["dist/server/entry.mjs"], {
-  env: { ...process.env, HOST: "127.0.0.1", PORT: String(port), DATABASE_PATH: database, ADMIN_PASSWORD_HASH: bcrypt.hashSync(password, 4) },
+  env: { ...process.env, HOST: "127.0.0.1", PORT: String(port), DATABASE_PATH: database, MEDIA_DIR: join(directory, "media"), ADMIN_PASSWORD_HASH: bcrypt.hashSync(password, 4) },
   stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
 });
 let output = "";
@@ -150,6 +151,65 @@ try {
   assert.equal((await get("/api/posts/99999", { method: "DELETE", headers: { cookie, origin } })).status, 404);
   assert.equal((await get("/api/posts/1abc", { method: "DELETE", headers: { cookie, origin } })).status, 400);
   assert.equal((await post("/api/posts", { title: "Bad date", slug: "bad-date", publishedAt: "no-date" }, { cookie })).status, 400);
+  // End-to-end writing workflow: private work, authenticated previews, media and history.
+  for (const path of ['/api/editor/drafts', '/api/media']) assert.equal((await get(path)).status, 401);
+  const opened = await post('/api/editor/drafts', { id: crypto.randomUUID() }, { cookie });
+  assert.equal(opened.status, 200);
+  let working = await opened.json();
+  const draftPath = `/api/editor/drafts/${working.id}`;
+  const saveWorking = data => get(draftPath, { method: 'PUT', headers: { cookie, origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ version: working.version, data }) });
+  assert.equal((await get(draftPath)).status, 401);
+  assert.equal((await get(`/admin/preview/${working.id}`)).status, 302);
+  assert.equal((await post(draftPath + '/publish', { version: working.version }, { cookie })).status, 400);
+  const png = await sharp({ create: { width: 4, height: 4, channels: 3, background: '#abc' } }).png().toBuffer();
+  const upload = await get('/api/media', { method: 'POST', body: png, headers: { cookie, origin, 'Content-Type': 'image/png' } });
+  assert.equal(upload.status, 201, await upload.clone().text());
+  const uploaded = await upload.json();
+  assert.equal((await get(uploaded.url)).status, 404, 'Draft images are private');
+  const privateImage = await get(uploaded.url, { headers: { cookie } });
+  assert.equal(privateImage.headers.get('content-type'), 'image/webp');
+  assert.match(privateImage.headers.get('cache-control'), /no-store/);
+  const saved = await saveWorking({ ...working.data, title: 'Workflow article', slug: 'workflow-article', content: `## Preview heading\n\nFirst published version\n\n![Image](${uploaded.url})`, coverImage: uploaded.url });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  const priorVersion = working.version;
+  working = await saved.json();
+  assert.equal((await get(draftPath, { method: 'PUT', headers: { cookie, origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ version: priorVersion, data: working.data }) })).status, 409);
+  assert.equal((await get('/blog/workflow-article')).status, 404);
+  const preview = await get(`/admin/preview/${working.id}`, { headers: { cookie } });
+  assert.equal(preview.status, 200);
+  assert.match(preview.headers.get('cache-control'), /no-store/);
+  assert.match(preview.headers.get('x-robots-tag'), /noindex/);
+  await checkScriptPolicy(preview);
+  const previewHtml = await preview.text();
+  assert.match(previewHtml, /First published version/);
+  assert.doesNotMatch(previewHtml, /giscus-container|data-post-slug/);
+  checkLocalLinks(previewHtml);
+  const publication = await post(draftPath + '/publish', { version: working.version }, { cookie });
+  assert.equal(publication.status, 200, await publication.clone().text());
+  const published = await publication.json();
+  const publicImage = await get(uploaded.url);
+  assert.equal(publicImage.status, 200);
+  const imageTag = publicImage.headers.get('etag');
+  assert.ok(imageTag);
+  assert.equal((await get(uploaded.url, { headers: { 'If-None-Match': imageTag } })).status, 304);
+  assert.equal((await get(draftPath, { headers: { cookie } })).status, 404);
+  working = await (await post('/api/editor/drafts', { id: crypto.randomUUID(), postId: published.id }, { cookie })).json();
+  const editPath = `/api/editor/drafts/${working.id}`;
+  assert.equal((await get(editPath + '/history')).status, 401);
+  const revisions = await (await get(editPath + '/history', { headers: { cookie } })).json();
+  working = await (await get(editPath, { method: 'PUT', headers: { cookie, origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ version: working.version, data: { ...working.data, content: 'Private unreviewed change' } }) })).json();
+  assert.doesNotMatch(await (await get('/blog/workflow-article')).text(), /Private unreviewed change/);
+  const restored = await post(editPath + '/history', { version: working.version, revisionId: revisions[0].id }, { cookie });
+  assert.equal(restored.status, 200);
+  working = await restored.json();
+  assert.match(working.data.content, /First published version/);
+  assert.equal((await post(editPath + '/publish', { version: working.version }, { cookie, origin: 'https://evil.example' })).status, 403);
+  assert.equal((await get(editPath, { method: 'DELETE', headers: { cookie, origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ version: working.version }) })).status, 200);
+  assert.equal((await get(`/api/posts/${published.id}`, { method: 'PUT', headers: { cookie, origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ draft: true }) })).status, 200);
+  assert.equal((await get(uploaded.url, { headers: { 'If-None-Match': imageTag } })).status, 404, 'Unpublishing revokes image access even for cached images');
+  assert.equal((await get('/api/media', { method: 'POST', body: '<svg/>', headers: { cookie, origin, 'Content-Type': 'image/svg+xml' } })).status, 415);
+  const hugeImage = new ReadableStream({ start(controller) { for (let i = 0; i < 129; i++) controller.enqueue(new Uint8Array(65536)); controller.close(); } });
+  assert.equal((await get('/api/media', { method: 'POST', body: hugeImage, duplex: 'half', headers: { cookie, origin, 'Content-Type': 'image/png' } })).status, 413);
   const stream = new ReadableStream({ start(controller) { for (let i = 0; i < 18; i++) controller.enqueue(new Uint8Array(65536)); controller.close(); } });
   const large = await get("/api/posts/preview", { method: "POST", headers: { "content-type": "application/json", cookie, origin }, body: stream, duplex: "half" });
   assert.equal(large.status, 413);

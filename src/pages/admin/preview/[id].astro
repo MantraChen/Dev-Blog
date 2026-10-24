@@ -1,0 +1,28 @@
+---
+import BaseLayout from "@/components/layout/BaseLayout.astro";
+import { validateSession } from "@/lib/auth";
+import { withBase, contentUrl } from "@/lib/site-path";
+import { getDraft } from "@/db/editor";
+import { renderMarkdown } from "@/lib/markdown";
+import { HttpError } from "@/lib/http-error";
+import { estimateReadingTime } from "@/lib/utils";
+if (!await validateSession(Astro.request.headers.get("cookie"))) return Astro.redirect(withBase("/admin/login"));
+let draft;
+try { draft = getDraft(Astro.params.id!); }
+catch (error) { if (error instanceof HttpError && error.status === 404) return Astro.rewrite(withBase("/404")); throw error; }
+const data = draft.data;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+---
+<BaseLayout title={`${data.title || "Untitled"} — Draft preview`} noIndex>
+  <div class="mx-auto max-w-4xl py-8">
+    <p class="mb-8 rounded-lg border bg-muted p-4 text-sm">Private draft preview · Comments and view tracking are disabled. <a class="underline" href={withBase("/admin")}>Return to editor</a></p>
+    <article>
+      {data.coverImage && <img src={contentUrl(data.coverImage)} alt={data.title} class="mb-6 max-h-96 w-full rounded-lg object-cover" />}
+      <h1 class="mb-4 text-3xl font-bold break-words">{data.title || "Untitled"}</h1>
+      <p class="mb-8 text-sm text-muted-foreground">{estimateReadingTime(data.content)} min read · {data.tags}</p>
+      <div class="prose prose-zinc dark:prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:rounded-lg">
+        <Fragment set:html={renderMarkdown(data.content)} />
+      </div>
+    </article>
+  </div>
+</BaseLayout>

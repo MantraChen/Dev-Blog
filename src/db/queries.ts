@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, lt, gt, or, count, sql, inArray } from "drizzle-orm";
 import { db, sqlite } from ".";
 import { executeSearch, searchInWorker } from "../lib/post-search";
+import { recordRevision, syncPostMedia } from "./post-history";
 import { projects, posts, postViews, statuses, skills, timeline, friends, reactions, adminSessions, auditLogs } from "./schema";
 import type {
   ProjectItem,
@@ -241,16 +242,26 @@ export async function getPostBySlug(slug: string): Promise<PostItem | null> {
   return rows[0] ?? null;
 }
 
-export async function createPost(data: NewPost) {
-  return db.insert(posts).values(data).returning();
+export function createPost(data: NewPost) {
+  return sqlite.transaction(() => {
+    const result = db.insert(posts).values(data).returning().all();
+    recordRevision(result[0]);
+    syncPostMedia(result[0]);
+    return result;
+  }).immediate();
 }
 
-export async function updatePost(id: number, data: Partial<NewPost>) {
-  return db
-    .update(posts)
-    .set({ ...data, updatedAt: new Date().toISOString() })
-    .where(eq(posts.id, id))
-    .returning();
+export function updatePost(id: number, data: Partial<NewPost>) {
+  return sqlite.transaction(() => {
+    const previous = db.select().from(posts).where(eq(posts.id, id)).get();
+    if (!previous) return [];
+    recordRevision(previous);
+    const result = db.update(posts).set({ ...data, version: previous.version + 1, updatedAt: new Date().toISOString() })
+      .where(eq(posts.id, id)).returning().all();
+    recordRevision(result[0]);
+    syncPostMedia(result[0]);
+    return result;
+  }).immediate();
 }
 
 export async function deletePost(id: number) {

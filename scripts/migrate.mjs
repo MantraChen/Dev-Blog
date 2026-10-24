@@ -45,7 +45,7 @@ const migrations = [{
       db.exec(`UPDATE posts SET ${field} = strftime('%Y-%m-%dT%H:%M:%fZ', ${field}) WHERE strftime('%Y-%m-%dT%H:%M:%fZ', ${field}) IS NOT NULL`);
     }
   },
-}, ...["005-search", "006-operational-state"].map(id => ({
+}, ...["005-search", "006-operational-state", "007-writing-workflow"].map(id => ({
   id, up(db) { db.exec(readFileSync(new URL(`../migrations/${id}.sql`, import.meta.url), "utf8")); },
 }))];
 

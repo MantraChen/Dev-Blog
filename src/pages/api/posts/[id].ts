@@ -33,7 +33,7 @@ export const PUT: APIRoute = async ({ params, request, clientAddress }) => {
   }
 
   if (!Object.keys(parsed.data).length) return Response.json({ error: "No fields to update" }, { status: 400 });
-  const result = await updatePost(id, parsed.data);
+  const result = updatePost(id, parsed.data);
   if (!result.length) return Response.json({ error: "Not found" }, { status: 404 });
 
   await createAuditLog({

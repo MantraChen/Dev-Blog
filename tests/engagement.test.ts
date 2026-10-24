@@ -35,7 +35,7 @@ test("repeat visits are deduplicated and statistics survive slug changes", async
   assert.equal((await react(context("public"))).status, 201);
   assert.equal((await react(context("public"))).status, 201);
   const post = await queries.getPublicPostIdentity("public");
-  await queries.updatePost(post!.id, { slug: "renamed" });
+  queries.updatePost(post!.id, { slug: "renamed" });
   assert.equal(await queries.getPostViewCount("renamed"), 1);
   assert.deepEqual(await queries.getReactionCounts("renamed"), { "👍": 1 });
   assert.equal((await queries.getTopPosts())[0].slug, "renamed");

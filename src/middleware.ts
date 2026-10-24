@@ -13,9 +13,10 @@ export const onRequest = defineMiddleware(async ({ request, clientAddress }, nex
   const url = new URL(request.url);
   const path = withoutBase(url.pathname).replace(/\/+$/, "") || "/";
   let response: Response;
+  const bodyLimit = path === "/api/media" ? 8 * 1024 * 1024 : 1024 * 1024;
   if (BASE_PATH && url.pathname !== BASE_PATH && !url.pathname.startsWith(`${BASE_PATH}/`)) {
     response = jsonError("Not found", 404);
-  } else if (Number(request.headers.get("content-length")) > 1024 * 1024) {
+  } else if (Number(request.headers.get("content-length")) > bodyLimit) {
     response = jsonError("Request body too large", 413);
   } else if (path.startsWith("/api/") && !isSameOriginMutation(request)) {
     response = jsonError("Cross-origin requests are not allowed", 403);

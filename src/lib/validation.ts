@@ -17,6 +17,8 @@ const httpUrl = z
     message: "URL must start with http:// or https://",
   });
 
+const imageUrl = z.union([httpUrl, z.string().regex(/^\/media\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/)]);
+
 const tags = z.array(z.string().trim().min(1).max(50)).max(20).transform(values => [...new Set(values)]);
 const publishedDate = z.union([z.iso.date(), z.iso.datetime({ offset: true })])
   .transform(value => new Date(value).toISOString());
@@ -31,7 +33,7 @@ export const createPostSchema = z.object({
     .max(200)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
   description: z.string().max(500).default(""),
-  coverImage: httpUrl.nullable().default(null),
+  coverImage: imageUrl.nullable().default(null),
   series: z.string().max(100).nullable().default(null),
   content: z.string().max(500_000).default(""),
   tags: tags.default([]),
@@ -49,7 +51,7 @@ export const updatePostSchema = z.object({
     .max(200)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
   description: z.string().max(500),
-  coverImage: httpUrl.nullable(),
+  coverImage: imageUrl.nullable(),
   series: z.string().max(100).nullable(),
   content: z.string().max(500_000),
   tags,
