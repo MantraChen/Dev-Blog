@@ -1,5 +1,6 @@
 ---
 import "@/styles/globals.css"
+import "katex/dist/katex.min.css"
 import { ClientRouter } from "astro:transitions"
 import Nav from "./Nav.astro"
 
@@ -35,8 +36,6 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site || "https://HowieLog
 
     <link rel="icon" id="dynamic-favicon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" integrity="sha384-zh0CIslj3dQfMkBTFMjBOMMnffbSNC9Af0mA+FVRv5SY+y3ePwPqhCKJ04nEC4UZ" crossorigin="anonymous" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
