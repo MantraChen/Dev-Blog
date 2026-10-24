@@ -73,15 +73,19 @@ if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Ca
         }
 
         function applyTheme() {
-          var theme = localStorage.getItem('theme') ||
+          var savedTheme;
+          try { savedTheme = localStorage.getItem('theme'); } catch {}
+          var theme = savedTheme ||
             (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
           var isDark = theme === 'dark';
           document.documentElement.classList.toggle('dark', isDark);
-          localStorage.setItem('theme', theme);
+          try { localStorage.setItem('theme', theme); } catch {}
           updateFavicon(isDark);
         }
         applyTheme();
 
+        if (window.__blogThemeBound) return;
+        window.__blogThemeBound = true;
         // Listen for theme changes from ThemeToggle component
         new MutationObserver(function() {
           updateFavicon(document.documentElement.classList.contains('dark'));
@@ -116,53 +120,6 @@ if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Ca
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
     </button>
 
-    <script is:inline>
-      function initReveal() {
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('reveal-active');
-              observer.unobserve(entry.target);
-            }
-          });
-        }, { threshold: 0.1 });
-        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-      }
-      initReveal();
-      document.addEventListener('astro:after-swap', initReveal);
-    </script>
-
-    <script is:inline>
-      let scrollListener;
-
-      function initScrollTop() {
-        const btn = document.getElementById('scroll-top');
-        if (!btn) return;
-
-        if (scrollListener) {
-          window.removeEventListener('scroll', scrollListener);
-        }
-
-        scrollListener = () => {
-          if (window.scrollY > 300) {
-            btn.classList.remove('opacity-0', 'pointer-events-none');
-            btn.classList.add('opacity-100', 'pointer-events-auto');
-          } else {
-            btn.classList.remove('opacity-100', 'pointer-events-auto');
-            btn.classList.add('opacity-0', 'pointer-events-none');
-          }
-        };
-
-        btn.addEventListener('click', () => {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-
-        window.addEventListener('scroll', scrollListener, { passive: true });
-        scrollListener();
-      }
-
-      initScrollTop();
-      document.addEventListener('astro:after-swap', initScrollTop);
-    </script>
+    <script>import "@/scripts/layout";</script>
   </body>
 </html>
