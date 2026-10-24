@@ -89,54 +89,82 @@ function enhance(root: ParentNode) {
         "Diagram exceeds limits or contains configuration. Source is shown below.";
       return;
     }
-    renderQueue = renderQueue.then(async () => {
-      if (!pre.isConnected) return;
-      try {
-        const [{ default: mermaid }, { default: purify }] = await Promise.all([
-          import("mermaid"),
-          import("dompurify"),
-        ]);
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: "strict",
-          htmlLabels: false,
-          maxTextSize: 10_000,
-          maxEdges: 200,
-          suppressErrorRendering: true,
-          theme: "neutral",
-        });
-        const rendered = await mermaid.render(
-          `content-diagram-${++diagramId}`,
-          source,
-        );
+    const render = () => {
+      renderQueue = renderQueue.then(async () => {
         if (!pre.isConnected) return;
-        result.innerHTML = purify.sanitize(rendered.svg, {
-          USE_PROFILES: { svg: true, svgFilters: true },
-          FORBID_TAGS: ["foreignObject", "script", "a", "image"],
-          FORBID_ATTR: ["href", "xlink:href"],
-        });
-        // Keep labels legible on narrow screens; the wrapper scrolls instead of
-        // shrinking a wide architecture diagram into unreadable text.
-        const svg = result.querySelector("svg");
-        if (svg?.viewBox.baseVal.width) {
-          svg.style.width = `${svg.viewBox.baseVal.width}px`;
-          svg.style.maxWidth = "none";
-          result.tabIndex = 0;
-          result.setAttribute(
-            "aria-label",
-            "Mermaid diagram; scroll horizontally to view wide diagrams",
+        try {
+          const [{ default: mermaid }, { default: purify }] = await Promise.all(
+            [import("mermaid"), import("dompurify")],
           );
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: "strict",
+            htmlLabels: false,
+            maxTextSize: 10_000,
+            maxEdges: 200,
+            suppressErrorRendering: true,
+            theme: "neutral",
+          });
+          const rendered = await mermaid.render(
+            `content-diagram-${++diagramId}`,
+            source,
+          );
+          if (!pre.isConnected) return;
+          result.innerHTML = purify.sanitize(rendered.svg, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+            FORBID_TAGS: ["foreignObject", "script", "a", "image"],
+            FORBID_ATTR: ["href", "xlink:href"],
+          });
+          // Keep labels legible on narrow screens; the wrapper scrolls instead of
+          // shrinking a wide architecture diagram into unreadable text.
+          const svg = result.querySelector("svg");
+          if (svg?.viewBox.baseVal.width) {
+            svg.style.width = `${svg.viewBox.baseVal.width}px`;
+            svg.style.maxWidth = "none";
+            result.tabIndex = 0;
+            result.setAttribute(
+              "aria-label",
+              "Mermaid diagram; scroll horizontally to view wide diagrams",
+            );
+          }
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = "Diagram source";
+          pre.before(details);
+          details.append(summary, pre);
+        } catch {
+          result.textContent =
+            "Unable to render this diagram. Source is shown below.";
         }
-        const details = document.createElement("details");
-        const summary = document.createElement("summary");
-        summary.textContent = "Diagram source";
-        pre.before(details);
-        details.append(summary, pre);
-      } catch {
-        result.textContent =
-          "Unable to render this diagram. Source is shown below.";
-      }
-    });
+      });
+    };
+    // Fetch diagram engines only when a diagram is near the viewport. Large
+    // authored graphs need an explicit click so scrolling never starts heavy work.
+    const load = document.createElement("button");
+    load.type = "button";
+    load.className = "rounded border px-3 py-2 text-sm";
+    load.textContent = "Render diagram";
+    result.append(load);
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+      load.remove();
+      render();
+    };
+    load.addEventListener("click", start, { once: true });
+    if (source.length <= 4000 && "IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            observer.disconnect();
+            start();
+          }
+        },
+        { rootMargin: "200px" },
+      );
+      observer.observe(result);
+    }
   });
 }
 enhance(document);

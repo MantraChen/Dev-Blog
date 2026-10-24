@@ -1,0 +1,23 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { withBase } from '@/lib/site-path';
+import { subscriptionChoices } from '@/lib/subscriptions';
+import { languages } from '@/lib/languages';
+const choices=subscriptionChoices();
+---
+<BaseLayout title="Subscribe | HowieLog">
+  <section class="mx-auto max-w-2xl space-y-6"><h1 class="text-3xl font-bold">Follow the topics you care about</h1><p class="text-muted-foreground">Choose filters to create an RSS subscription. Filters combine; leave everything empty for the full blog. Feeds contain the latest 200 matching public articles.</p>
+    <form id="feed-builder" class="space-y-4" action={withBase('/rss.xml')} method="get">
+      {[['tag','Tag',choices.tags],['category','Category',choices.categories],['series','Series',choices.series],['language','Language',choices.languages]].map(([name,label,values])=><label class="block text-sm">{label as string}<select class="mt-2 w-full rounded border bg-background p-3" name={name as string}><option value="">All</option>{(values as string[]).map(value=><option value={value}>{name==='language'?languages[value as keyof typeof languages]||value:value}</option>)}</select></label>)}
+      <button class="rounded bg-primary px-4 py-2 text-primary-foreground">Open RSS feed</button>
+      <label class="block text-sm">Subscription URL<input id="feed-url" class="mt-2 w-full rounded border bg-background p-3" readonly value={new URL(withBase('/rss.xml'),Astro.site).href}/></label><p class="text-xs text-muted-foreground">Copy this URL into your preferred feed reader. No account or email address is required.</p>
+    </form>
+  </section>
+  <script>
+    import {withBase} from '@/lib/site-path';
+    const form=document.getElementById('feed-builder') as HTMLFormElement,output=document.getElementById('feed-url') as HTMLInputElement;
+    const site=new URL(output.value).origin;
+    form.addEventListener('change',()=>{const params=new URLSearchParams();for(const [key,value]of new FormData(form))if(String(value))params.set(key,String(value));output.value=new URL(withBase('/rss.xml')+(params.size?'?'+params:''),site).href;});
+    output.addEventListener('focus',()=>output.select());
+  </script>
+</BaseLayout>

@@ -81,6 +81,7 @@ const migrations = [
     "006-operational-state",
     "007-writing-workflow",
     "008-content-platform",
+    "009-publishing-operations",
   ].map((id) => ({
     id,
     up(db) {

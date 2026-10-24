@@ -6,6 +6,7 @@ import { recordRevision } from "./post-history";
 import { createPostSchema } from "../lib/validation";
 import {
   emptyEditorData,
+  editorDataSchema,
   toEditorData,
   type EditorData,
   type EditorDraft,
@@ -16,13 +17,12 @@ import { HttpError } from "../lib/http-error";
 type DraftRow = Omit<EditorDraft, "data"> & { data: string };
 const decode = (row: DraftRow): EditorDraft => ({
   ...row,
-  data: JSON.parse(row.data),
+  data: editorDataSchema.parse(JSON.parse(row.data)),
 });
 
 export function getDraft(id: string): EditorDraft {
   const row = sqlite.prepare("SELECT * FROM post_drafts WHERE id=?").get(id) as
-    | DraftRow
-    | undefined;
+    DraftRow | undefined;
   if (!row) throw new HttpError(404, "Draft not found");
   if (
     row.postId &&
@@ -163,7 +163,7 @@ export function publishDraft(
       ) {
         throw new HttpError(
           409,
-          "The published post changed after this draft was opened. Copy your changes and start from its latest version.",
+          "The published post changed after this draft was opened. Compare and merge changes before publishing.",
         );
       }
       const parsed = createPostSchema.safeParse({
@@ -218,10 +218,12 @@ export function getRevision(postId: number, revisionId: number) {
       "SELECT id, version, data, savedAt FROM post_revisions WHERE postId=? AND id=?",
     )
     .get(postId, revisionId) as
-    | { id: number; version: number; data: string; savedAt: string }
-    | undefined;
+    { id: number; version: number; data: string; savedAt: string } | undefined;
   if (!revision) throw new HttpError(404, "Revision not found");
-  return { ...revision, data: JSON.parse(revision.data) as EditorData };
+  return {
+    ...revision,
+    data: editorDataSchema.parse(JSON.parse(revision.data)),
+  };
 }
 
 export function restoreRevision(

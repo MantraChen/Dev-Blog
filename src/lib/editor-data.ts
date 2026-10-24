@@ -1,7 +1,11 @@
 import { z } from "zod";
+import { languageSchema, translationKeySchema } from "./languages";
 
 // Drafts may be incomplete. Publication uses the stricter post schema.
 export const editorDataSchema = z.object({
+  language: languageSchema.default("zh-CN"),
+  translationKey: translationKeySchema.default(""),
+  category: z.string().trim().max(60).default(""),
   title: z.string().max(200),
   slug: z.string().max(200),
   description: z.string().max(500),
@@ -46,6 +50,9 @@ export const restoreDraftSchema = draftVersionSchema.extend({
 export function toEditorData(post: {
   title: string;
   slug: string;
+  language?: string;
+  translationKey?: string | null;
+  category?: string;
   description: string;
   content: string;
   tags: string[];
@@ -60,6 +67,9 @@ export function toEditorData(post: {
     ? post.publishedAt.replace(" ", "T") + "Z"
     : post.publishedAt;
   return {
+    language: languageSchema.catch("zh-CN").parse(post.language),
+    translationKey: post.translationKey || "",
+    category: post.category || "",
     title: post.title,
     slug: post.slug,
     description: post.description,
@@ -78,6 +88,9 @@ export function toEditorData(post: {
 
 export function emptyEditorData(): EditorData {
   return {
+    language: "zh-CN",
+    translationKey: "",
+    category: "",
     title: "",
     slug: "",
     description: "",

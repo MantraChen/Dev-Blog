@@ -71,7 +71,30 @@ test("full backup restores database, images, search and revisions atomically whi
   sqlite
     .prepare("INSERT INTO admin_sessions(id,expiresAt) VALUES (?,?)")
     .run(crypto.randomUUID(), new Date(Date.now() + 60_000).toISOString());
+  sqlite
+    .prepare("INSERT INTO admin_passkeys VALUES (?,?,?,?,?,?,NULL)")
+    .run(
+      "old-key",
+      Buffer.from("old"),
+      1,
+      "[]",
+      "Revoked later",
+      new Date().toISOString(),
+    );
+  const { createShare, readShare } = await import("../src/db/publishing");
+  const shared = createShare(saved.id, saved.version, 1);
   const backup = await createFullBackup(sqlite, paths);
+  sqlite.prepare("DELETE FROM admin_passkeys").run();
+  sqlite
+    .prepare("INSERT INTO admin_passkeys VALUES (?,?,?,?,?,?,NULL)")
+    .run(
+      "current-key",
+      Buffer.from("current"),
+      7,
+      "[]",
+      "Current key",
+      new Date().toISOString(),
+    );
   q.updatePost(post.id, { title: "Later content", slug: "snapshot-renamed" });
   c.saveNow("Later Now page");
   const preview = await inspectFullBackup(sqlite, paths, backup.id);
@@ -104,6 +127,15 @@ test("full backup restores database, images, search and revisions atomically whi
   assert.equal(c.getNow().content, "");
   assert.equal((c.listSchedules()[0] as any).status, "cancelled");
   assert.equal(sqlite.prepare("SELECT * FROM admin_sessions").all().length, 0);
+  assert.deepEqual(
+    sqlite.prepare("SELECT id,counter FROM admin_passkeys").all(),
+    [{ id: "current-key", counter: 7 }],
+  );
+  assert.equal(
+    readShare(shared.token),
+    null,
+    "Restore must not resurrect revoked preview links",
+  );
   assert.equal((await m.readMedia(asset.id))!.length, asset.bytes);
   assert.deepEqual(sqlite.pragma("foreign_key_check"), []);
   assert.equal((await listFullBackups(paths)).length, 2);

@@ -76,6 +76,10 @@ export interface TimelineItem {
 
 export interface PostItem {
   id: number;
+  version: number;
+  language: string;
+  translationKey: string | null;
+  category: string;
   title: string;
   slug: string;
   description: string;

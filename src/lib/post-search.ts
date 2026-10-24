@@ -8,6 +8,8 @@ export type SearchOptions = {
   page?: number;
   year?: string;
   series?: string;
+  language?: string;
+  category?: string;
 };
 type SearchPage = {
   ids: number[];
@@ -49,6 +51,14 @@ export function executeSearch(
   if (options.series) {
     clauses.push("series=?");
     args.push(options.series.slice(0, 100));
+  }
+  if (options.language) {
+    clauses.push("language=?");
+    args.push(options.language.slice(0, 20));
+  }
+  if (options.category) {
+    clauses.push("category=?");
+    args.push(options.category.slice(0, 60));
   }
   const where = clauses.join(" AND ");
   // A read transaction gives the count and page a consistent WAL snapshot.

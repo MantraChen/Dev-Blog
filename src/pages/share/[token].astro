@@ -1,0 +1,19 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { readShare } from '@/db/publishing';
+import { renderMarkdown } from '@/lib/markdown';
+import { withBase, contentUrl } from '@/lib/site-path';
+const token=Astro.params.token!;
+const share=readShare(token);
+if(!share) return Astro.rewrite(withBase('/404'));
+const image=(url:string)=>contentUrl(url).replace(/\/media\/([0-9a-f-]{36})\.webp/g,`/share-media/${token}/$1.webp`);
+const html=renderMarkdown(share.data.content).replace(/(src=")([^"]+)(")/g,(_,a,url,b)=>a+image(url)+b);
+---
+<BaseLayout title={`${share.data.title || 'Untitled'} · Private preview`} noIndex canonicalPath="/share" language={share.data.language}>
+  <article class="mx-auto max-w-3xl">
+    <p class="mb-6 rounded border p-4 text-sm">Private draft snapshot · Expires {new Date(share.expiresAt).toLocaleString('en-GB',{timeZone:'UTC'})} UTC. This link can be revoked by the author.</p>
+    <h1 class="mb-5 text-3xl font-bold">{share.data.title || 'Untitled'}</h1>
+    {share.data.coverImage && <img src={image(share.data.coverImage)} alt={share.data.title} class="mb-6 rounded"/>}
+    <div class="prose dark:prose-invert max-w-none"><Fragment set:html={html}/></div>
+  </article>
+</BaseLayout>

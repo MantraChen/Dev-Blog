@@ -9,6 +9,8 @@ export const GET: APIRoute = async ({ url }) => {
     page: Number(url.searchParams.get("page") || 1),
     year: url.searchParams.get("year") || "",
     series: url.searchParams.get("series") || "",
+    language: url.searchParams.get("language") || "",
+    category: url.searchParams.get("category") || "",
   });
   const query = (url.searchParams.get("q") || "").trim().slice(0, 200);
   return Response.json(

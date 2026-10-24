@@ -13,6 +13,11 @@ import {
 } from "@/lib/editor-client";
 import type { EditorData, EditorDraft } from "@/lib/editor-data";
 import type { MediaItem } from "@/lib/media";
+import { WritingTools } from "./WritingTools";
+import { RevisionDiff } from "./RevisionDiff";
+import { MergeReview } from "./MergeReview";
+import { languages } from "@/lib/languages";
+import type { PreflightIssue } from "@/lib/preflight";
 
 const field =
   "w-full rounded-md border bg-transparent px-3 py-2 text-sm disabled:opacity-60";
@@ -34,6 +39,17 @@ export function WritingEditor({
   onClose: () => void;
 }) {
   const [data, setData] = useState(initial.data);
+  const [publishCheck, setPublishCheck] = useState<{
+    version: number;
+    issues: PreflightIssue[];
+  } | null>(null);
+  const [merge, setMerge] = useState<{
+    base: EditorData;
+    local: EditorData;
+    remote: EditorData;
+    version: number;
+    postVersion?: number;
+  } | null>(null);
   const [status, setStatus] = useState("Saved to server");
   const [error, setError] = useState("");
   const [cacheError, setCacheError] = useState("");
@@ -66,6 +82,16 @@ export function WritingEditor({
     undefined,
   );
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const publishReview = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (publishCheck) {
+      publishReview.current?.scrollIntoView({
+        block: "start",
+        behavior: "smooth",
+      });
+      publishReview.current?.focus({ preventScroll: true });
+    }
+  }, [publishCheck]);
   const draftPath = `/api/editor/drafts/${initial.id}`;
 
   function persistLocal() {
@@ -270,9 +296,23 @@ export function WritingEditor({
     } catch {}
     onClose();
   }
-  async function publish() {
+  async function publish(acknowledgedVersion?: number) {
     await action(async () => {
       const saved = await flush();
+      const check = await editorRequest<{
+        version: number;
+        issues: PreflightIssue[];
+      }>("/api/publishing/preflight", "POST", {
+        draftId: initial.id,
+        version: saved.version,
+      });
+      if (
+        check.issues.some((issue) => issue.severity === "error") ||
+        (check.issues.length && acknowledgedVersion !== saved.version)
+      ) {
+        setPublishCheck(check);
+        return;
+      }
       await editorRequest(draftPath + "/publish", "POST", {
         version: saved.version,
       });
@@ -435,6 +475,51 @@ export function WritingEditor({
             >
               Reload server draft
             </button>
+            <button
+              className={button}
+              disabled={busy || !!merge}
+              onClick={() =>
+                void action(async () => {
+                  await queue.current.catch(() => {});
+                  const source = await editorRequest<{
+                    draft: EditorDraft;
+                    published: {
+                      version: number;
+                      data: EditorData;
+                      base: EditorData | null;
+                    } | null;
+                  }>(draftPath + "/merge");
+                  blocked.current = true;
+                  if (source.draft.version !== server.current.version) {
+                    setMerge({
+                      base: JSON.parse(committed.current),
+                      local: current.current,
+                      remote: source.draft.data,
+                      version: source.draft.version,
+                    });
+                  } else if (source.published) {
+                    if (!source.published.base)
+                      throw new Error(
+                        "The original version has aged out of history. Download your edits and compare with the latest article before replacing the draft.",
+                      );
+                    setMerge({
+                      base: source.published.base,
+                      local: current.current,
+                      remote: source.published.data,
+                      version: source.draft.version,
+                      postVersion: source.published.version,
+                    });
+                  } else {
+                    blocked.current = false;
+                    setError(
+                      "The server draft has not changed. Your local edits are preserved; retry saving.",
+                    );
+                  }
+                })
+              }
+            >
+              Compare and merge changes
+            </button>
           </div>
         </div>
       )}
@@ -443,7 +528,118 @@ export function WritingEditor({
           {cacheError}
         </p>
       )}
-      <fieldset disabled={!ready || busy} className="space-y-4">
+      {merge && (
+        <MergeReview
+          base={merge.base}
+          local={merge.local}
+          remote={merge.remote}
+          onCancel={() => {
+            setMerge(null);
+            setError(
+              "Merge cancelled. Your edits are preserved. Compare again or reload the server draft to resolve the conflict.",
+            );
+          }}
+          onSave={async (data) => {
+            const saved = await editorRequest<EditorDraft>(
+              draftPath + "/merge",
+              "POST",
+              { version: merge.version, postVersion: merge.postVersion, data },
+            );
+            adopt(saved);
+            setMerge(null);
+          }}
+        />
+      )}
+      {publishCheck && (
+        <section
+          className="mb-4 space-y-2 rounded border p-4 text-sm"
+          aria-label="Publish review"
+          ref={publishReview}
+          tabIndex={-1}
+        >
+          <h3 className="font-semibold">Review before publishing</h3>
+          {publishCheck.issues.map((issue, i) => (
+            <p key={i}>
+              {issue.severity}: {issue.message}
+            </p>
+          ))}
+          <button
+            className={button}
+            disabled={
+              busy ||
+              publishCheck.issues.some((issue) => issue.severity === "error")
+            }
+            onClick={() => void publish(publishCheck.version)}
+          >
+            Publish after review
+          </button>
+          <button className={button} onClick={() => setPublishCheck(null)}>
+            Keep editing
+          </button>
+        </section>
+      )}
+      <fieldset disabled={!ready || busy || !!merge} className="space-y-4">
+        <WritingTools
+          draftId={initial.id}
+          flush={flush}
+          insert={(content, replace) => {
+            if (
+              replace &&
+              current.current.content.trim() &&
+              !confirm("Replace the current body with this template?")
+            )
+              return;
+            const start =
+                textarea.current?.selectionStart ??
+                current.current.content.length,
+              end = textarea.current?.selectionEnd ?? start;
+            update({
+              content: replace
+                ? content
+                : current.current.content.slice(0, start) +
+                  content +
+                  current.current.content.slice(end),
+            });
+          }}
+        />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <label className="space-y-1 text-sm">
+            Language
+            <select
+              aria-label="Article language"
+              className={field}
+              value={data.language}
+              onChange={(e) =>
+                update({ language: e.target.value as EditorData["language"] })
+              }
+            >
+              {Object.entries(languages).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1 text-sm">
+            Translation group
+            <input
+              className={field}
+              value={data.translationKey}
+              maxLength={100}
+              placeholder="same-key-for-all-translations"
+              onChange={(e) => update({ translationKey: e.target.value })}
+            />
+          </label>
+          <label className="space-y-1 text-sm">
+            Category
+            <input
+              className={field}
+              value={data.category}
+              maxLength={60}
+              onChange={(e) => update({ category: e.target.value })}
+            />
+          </label>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-1 text-sm">
             Title
@@ -819,6 +1015,9 @@ export function WritingEditor({
                     Version {revision.version}: {revision.data.title}
                   </p>
                   <div className="grid gap-3 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <RevisionDiff before={revision.data} after={data} />
+                    </div>
                     <label className="text-sm">
                       Working draft
                       <textarea

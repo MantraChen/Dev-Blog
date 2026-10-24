@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { languageSchema, translationKeySchema } from "./languages";
 
 export const loginSchema = z.object({ password: z.string().min(1).max(1024) });
 
@@ -37,6 +38,12 @@ const publishedDate = z
 // ─── Posts ───────────────────────────────────────────────────────────
 
 export const createPostSchema = z.object({
+  language: languageSchema.default("zh-CN"),
+  translationKey: translationKeySchema
+    .nullable()
+    .default(null)
+    .transform((value) => value || null),
+  category: z.string().trim().max(60).default(""),
   title: z.string().min(1).max(200),
   slug: z
     .string()
@@ -60,6 +67,11 @@ export const createPostSchema = z.object({
 
 export const updatePostSchema = z
   .object({
+    language: languageSchema,
+    translationKey: translationKeySchema
+      .nullable()
+      .transform((value) => value || null),
+    category: z.string().trim().max(60),
     title: z.string().min(1).max(200),
     slug: z
       .string()

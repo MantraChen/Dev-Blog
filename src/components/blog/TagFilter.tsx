@@ -2,6 +2,7 @@ import { withBase, contentUrl } from "@/lib/site-path";
 import React, { useState, useEffect } from "react";
 
 import type { PostSummary } from "@/lib/post-summary";
+import { languages } from "@/lib/languages";
 import { Highlight } from "./Highlight";
 
 interface Props {
@@ -14,6 +15,9 @@ interface Props {
   initialTotal: number;
   initialYear: string;
   initialSeries: string;
+  initialLanguage: string;
+  initialCategory: string;
+  categories: string[];
   years: string[];
   seriesOptions: string[];
 }
@@ -28,9 +32,14 @@ export function TagFilter({
   initialTotal,
   initialYear,
   initialSeries,
+  initialLanguage,
+  initialCategory,
+  categories,
   years,
   seriesOptions,
 }: Props) {
+  const [language, setLanguage] = useState(initialLanguage),
+    [category, setCategory] = useState(initialCategory);
   const [year, setYear] = useState(initialYear),
     [series, setSeries] = useState(initialSeries);
   const [activeTag, setActiveTag] = useState<string | null>(initialTag || null);
@@ -50,7 +59,7 @@ export function TagFilter({
       null,
       "",
       withBase(
-        `/blog?${new URLSearchParams({ q: query, tag: activeTag || "", year, series, page: String(page) })}`,
+        `/blog?${new URLSearchParams({ q: query, tag: activeTag || "", year, series, language, category, page: String(page) })}`,
       ),
     );
     if (
@@ -58,7 +67,9 @@ export function TagFilter({
       (activeTag || "") === initialTag &&
       page === initialPage &&
       year === initialYear &&
-      series === initialSeries
+      series === initialSeries &&
+      language === initialLanguage &&
+      category === initialCategory
     ) {
       setSearchResults(null);
       setTotal(initialTotal);
@@ -71,7 +82,7 @@ export function TagFilter({
       try {
         const res = await fetch(
           withBase(
-            `/api/posts/search?${new URLSearchParams({ q: query, tag: activeTag || "", year, series, page: String(page) })}`,
+            `/api/posts/search?${new URLSearchParams({ q: query, tag: activeTag || "", year, series, language, category, page: String(page) })}`,
           ),
           { signal: controller.signal },
         );
@@ -113,6 +124,10 @@ export function TagFilter({
     series,
     initialYear,
     initialSeries,
+    initialLanguage,
+    initialCategory,
+    language,
+    category,
     initialQuery,
     initialTag,
     initialPage,
@@ -122,7 +137,7 @@ export function TagFilter({
   const displayPosts = searchResults ?? posts;
   const pageUrl = (number: number) =>
     withBase(
-      `/blog?${new URLSearchParams({ q: searchQuery.trim(), tag: activeTag || "", year, series, page: String(number) })}`,
+      `/blog?${new URLSearchParams({ q: searchQuery.trim(), tag: activeTag || "", year, series, language, category, page: String(number) })}`,
     );
 
   return (
@@ -148,6 +163,40 @@ export function TagFilter({
         />
       </form>
       <div className="mb-5 flex flex-wrap gap-3">
+        <label className="text-sm">
+          Language{" "}
+          <select
+            className="rounded border bg-background p-2"
+            value={language}
+            onChange={(e) => {
+              setLanguage(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All languages</option>
+            {Object.entries(languages).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm">
+          Category{" "}
+          <select
+            className="rounded border bg-background p-2"
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All categories</option>
+            {categories.map((value) => (
+              <option key={value}>{value}</option>
+            ))}
+          </select>
+        </label>
         <label className="text-sm">
           Year{" "}
           <select

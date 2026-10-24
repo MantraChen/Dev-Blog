@@ -97,9 +97,12 @@ export function reorderSeries(slug: string, ids: number[]) {
 export function relatedPosts(id: number) {
   return sqlite
     .prepare(
-      `SELECT p.slug,p.title FROM posts p JOIN posts source ON source.id=? WHERE p.id!=source.id AND p.draft=0 AND p.hidden=0 AND p.deletedAt IS NULL
-    AND ((p.series IS NOT NULL AND p.series=source.series) OR EXISTS(SELECT 1 FROM json_each(p.tags) a JOIN json_each(source.tags) b ON a.value=b.value))
-    ORDER BY CASE WHEN p.series=source.series THEN 0 ELSE 1 END,p.publishedAt DESC LIMIT 4`,
+      `WITH source AS (SELECT id,series FROM posts WHERE id=?), candidates AS (
+        SELECT t.postId AS id FROM post_topics t JOIN post_topics s ON t.tag=s.tag WHERE s.postId=(SELECT id FROM source)
+        UNION SELECT id FROM posts WHERE series=(SELECT series FROM source)
+      ) SELECT p.slug,p.title FROM posts p WHERE p.id IN (SELECT id FROM candidates) AND p.id!=(SELECT id FROM source)
+      AND p.draft=0 AND p.hidden=0 AND p.deletedAt IS NULL
+      ORDER BY CASE WHEN p.series=(SELECT series FROM source) THEN 0 ELSE 1 END,p.publishedAt DESC LIMIT 4`,
     )
     .all(id) as { slug: string; title: string }[];
 }
@@ -215,6 +218,16 @@ export function publishDue(now = new Date().toISOString()) {
 export function mediaReferences(id: string) {
   const needle = `%/media/${id}.webp%`;
   return [
+    ...sqlite
+      .prepare(
+        "SELECT id,json_extract(data,'$.title') title,'shared preview' kind FROM preview_shares WHERE data LIKE ? AND expiresAt>?",
+      )
+      .all(needle, new Date().toISOString()),
+    ...sqlite
+      .prepare(
+        "SELECT id,name title,kind FROM writing_assets WHERE content LIKE ?",
+      )
+      .all(needle),
     ...sqlite
       .prepare(
         "SELECT p.id,p.title,CASE WHEN p.deletedAt IS NOT NULL THEN 'trash' WHEN p.draft=1 THEN 'article draft' ELSE 'article' END AS kind FROM post_media m JOIN posts p ON p.id=m.postId WHERE m.mediaId=?",

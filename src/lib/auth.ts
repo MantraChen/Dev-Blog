@@ -5,7 +5,12 @@ import { sqlite } from "../db";
 import { parseSessionCookie } from "./request-security";
 import { COOKIE_PATH, SESSION_COOKIE } from "./site-path";
 export { getClientIp } from "./request-security";
-import { createAdminSession, getAdminSession, deleteAdminSession, cleanExpiredSessions } from "@/db/queries";
+import {
+  createAdminSession,
+  getAdminSession,
+  deleteAdminSession,
+  cleanExpiredSessions,
+} from "@/db/queries";
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -13,13 +18,21 @@ const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
-const loginAttempts = new RateLimiter(sqlite, "login", LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
+const loginAttempts = new RateLimiter(
+  sqlite,
+  "login",
+  LOGIN_MAX_ATTEMPTS,
+  LOGIN_WINDOW_MS,
+);
 export const checkRateLimit = (ip: string) => loginAttempts.check(ip);
 export const clearRateLimit = (ip: string) => loginAttempts.clear(ip);
 
 // ─── Login ──────────────────────────────────────────────────────────
 
-export async function login(password: string): Promise<string | null> {
+export async function login(
+  password: string,
+  userAgent = "Unknown device",
+): Promise<string | null> {
   const hash = process.env.ADMIN_PASSWORD_HASH;
   if (!hash || !(await compare(password, hash))) {
     return null;
@@ -31,6 +44,16 @@ export async function login(password: string): Promise<string | null> {
   const sessionId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
   await createAdminSession(sessionId, expiresAt);
+  sqlite
+    .prepare(
+      "UPDATE admin_sessions SET userAgent=?,lastSeenAt=?,verifiedAt=? WHERE id=?",
+    )
+    .run(
+      userAgent.slice(0, 300),
+      new Date().toISOString(),
+      Date.now(),
+      sessionId,
+    );
 
   return sessionId;
 }
@@ -51,6 +74,15 @@ export async function validateSession(
     return false;
   }
 
+  sqlite
+    .prepare(
+      "UPDATE admin_sessions SET lastSeenAt=? WHERE id=? AND (lastSeenAt IS NULL OR lastSeenAt<?)",
+    )
+    .run(
+      new Date().toISOString(),
+      sessionId,
+      new Date(Date.now() - 300000).toISOString(),
+    );
   return true;
 }
 

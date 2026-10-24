@@ -154,6 +154,7 @@ try {
     "/review",
     "/review/2026",
     "/bookmarks",
+    "/subscribe",
   ]) {
     const response = await get(path);
     assert.equal(response.status, 200, path);
@@ -174,7 +175,9 @@ try {
     html.includes(`rel="canonical" href="${site}${base}/blog/public-1"`),
   );
   assert.ok(
-    html.includes(`property="og:image" content="${site}${base}/icon-512.png"`),
+    html.includes(
+      `property="og:image" content="${site}${base}/cards/public-1.png"`,
+    ),
   );
   assert.ok(html.includes(`href="${base}/blog/public-2?q=1#heading"`));
   assert.ok(html.includes(`src="${base}/icon-512.png"`));
@@ -302,6 +305,47 @@ try {
   assert.ok(login.headers.get("set-cookie").startsWith(sessionName + "="));
   assert.ok(login.headers.get("set-cookie").includes(`Path=${base}/;`));
   let cookie = login.headers.get("set-cookie").split(";")[0];
+  for (const path of [
+    "/api/operations",
+    "/api/auth/passkey",
+    "/api/publishing/assets",
+  ]) {
+    assert.equal((await get(path)).status, 401, path);
+    const response = await get(path, { headers: { cookie } });
+    assert.equal(response.status, 200, await response.clone().text());
+    assert.match(response.headers.get("cache-control"), /no-store/);
+  }
+  const sessions = await (
+    await get("/api/auth/passkey", { headers: { cookie } })
+  ).json();
+  assert.ok(sessions.sessions.some((session) => session.current));
+  assert.ok(!JSON.stringify(sessions).includes(cookie.split("=")[1]));
+  assert.equal(
+    (
+      await post(
+        "/api/auth/passkey",
+        { action: "register-options", password },
+        { cookie, origin: "https://evil.example" },
+      )
+    ).status,
+    403,
+  );
+  const asset = await post(
+    "/api/publishing/assets",
+    {
+      action: "save",
+      kind: "snippet",
+      name: "HTTP fixture",
+      content: 'console.log("fixture")',
+    },
+    { cookie },
+  );
+  assert.equal(asset.status, 200);
+  assert.equal(
+    (await post("/api/operations", { action: "backup" }, { cookie })).status,
+    400,
+    "Missing backup configuration must fail explicitly",
+  );
   await checkScriptPolicy(await get("/admin", { headers: { cookie } }));
   const admin = await get("/api/posts", { headers: { cookie } });
   assert.equal(admin.status, 200);
@@ -423,6 +467,58 @@ try {
   await checkScriptPolicy(preview);
   const previewHtml = await preview.text();
   assert.match(previewHtml, /First published version/);
+  const check = await post(
+    "/api/publishing/preflight",
+    { draftId: working.id, version: working.version },
+    { cookie },
+  );
+  assert.equal(check.status, 200, await check.clone().text());
+  assert.equal(
+    (
+      await get("/api/publishing/shares?draftId=invalid", {
+        headers: { cookie },
+      })
+    ).status,
+    400,
+  );
+  const shared = await post(
+    "/api/publishing/shares",
+    {
+      action: "create",
+      draftId: working.id,
+      version: working.version,
+      hours: 1,
+    },
+    { cookie },
+  );
+  assert.equal(shared.status, 200, await shared.clone().text());
+  const share = await shared.json();
+  const sharedPage = await get("/share/" + share.token);
+  assert.equal(sharedPage.status, 200, await sharedPage.clone().text());
+  assert.match(sharedPage.headers.get("cache-control"), /no-store/);
+  assert.equal(sharedPage.headers.get("referrer-policy"), "no-referrer");
+  assert.match(sharedPage.headers.get("x-robots-tag"), /noindex/);
+  checkLocalLinks(await sharedPage.clone().text());
+  await checkScriptPolicy(sharedPage);
+  assert.equal(
+    (await get(`/share-media/${share.token}/${uploaded.id}.webp`)).status,
+    200,
+  );
+  assert.equal(
+    (await get(`/share-media/${share.token}/${crypto.randomUUID()}.webp`))
+      .status,
+    404,
+  );
+  await post(
+    "/api/publishing/shares",
+    { action: "revoke", id: share.id },
+    { cookie },
+  );
+  assert.equal((await get("/share/" + share.token)).status, 404);
+  assert.equal(
+    (await get(`/share-media/${share.token}/${uploaded.id}.webp`)).status,
+    404,
+  );
   assert.doesNotMatch(previewHtml, /giscus-container|data-post-slug/);
   checkLocalLinks(previewHtml);
   const publication = await post(
@@ -432,6 +528,15 @@ try {
   );
   assert.equal(publication.status, 200, await publication.clone().text());
   const published = await publication.json();
+  const card = await get(`/cards/${published.slug}.png`);
+  assert.equal(card.status, 200, await card.clone().text());
+  assert.equal(card.headers.get("content-type"), "image/png");
+  assert.equal(
+    (await sharp(Buffer.from(await card.arrayBuffer())).metadata()).width,
+    1200,
+  );
+  assert.equal((await get("/cards/draft.png")).status, 404);
+  assert.equal((await get("/cards/hidden.png")).status, 404);
   const publicImage = await get(uploaded.url);
   assert.equal(publicImage.status, 200);
   const imageTag = publicImage.headers.get("etag");
@@ -791,6 +896,161 @@ try {
   const signInAgain = await post("/api/auth/login", { password });
   assert.equal(signInAgain.status, 200);
   cookie = signInAgain.headers.get("set-cookie").split(";")[0];
+  const translated = await post(
+    "/api/posts",
+    {
+      title: "English counterpart",
+      slug: "english-counterpart",
+      language: "en",
+      translationKey: "http-translation",
+      category: "Engineering",
+      tags: ["translation"],
+      draft: false,
+    },
+    { cookie },
+  );
+  assert.equal(translated.status, 201, await translated.clone().text());
+  const original = await post(
+    "/api/posts",
+    {
+      title: "中文对应文章",
+      slug: "chinese-counterpart",
+      language: "zh-CN",
+      translationKey: "http-translation",
+      category: "Engineering",
+      tags: ["translation"],
+      draft: false,
+    },
+    { cookie },
+  );
+  assert.equal(original.status, 201, await original.clone().text());
+  const bilingual = await (await get("/blog/chinese-counterpart")).text();
+  assert.ok(bilingual.includes('hreflang="en"'));
+  assert.ok(bilingual.includes('lang="zh-CN"'));
+  assert.ok(bilingual.includes(`${base}/blog/english-counterpart`));
+  const feed = await (
+    await get("/rss.xml?language=en&category=Engineering&tag=translation")
+  ).text();
+  assert.match(feed, /English counterpart/);
+  assert.doesNotMatch(feed, /中文对应文章/);
+  assert.equal((await get("/rss.xml?language=invalid")).status, 400);
+  const languageFiltered = await (
+    await get("/api/posts/search?language=en&category=Engineering")
+  ).json();
+  assert.deepEqual(
+    languageFiltered.map((post) => post.slug),
+    ["english-counterpart"],
+  );
+  // Rebase a working draft when a separate API update changes the publication.
+  const translationPost = await translated.json();
+  const rebaseOpened = await post(
+    "/api/editor/drafts",
+    {
+      id: crypto.randomUUID(),
+      postId: translationPost.id,
+    },
+    { cookie },
+  );
+  assert.equal(rebaseOpened.status, 200);
+  const rebaseDraft = await rebaseOpened.json();
+  const rebasePath = `/api/editor/drafts/${rebaseDraft.id}`;
+  const changedPublication = await get(`/api/posts/${translationPost.id}`, {
+    method: "PUT",
+    headers: { cookie, origin, "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "Updated English counterpart" }),
+  });
+  assert.equal(
+    changedPublication.status,
+    200,
+    await changedPublication.clone().text(),
+  );
+  const mergeState = await (
+    await get(rebasePath + "/merge", { headers: { cookie } })
+  ).json();
+  assert.equal(mergeState.published.base.title, "English counterpart");
+  assert.equal(mergeState.published.data.title, "Updated English counterpart");
+  assert.equal(
+    (
+      await post(
+        rebasePath + "/publish",
+        { version: rebaseDraft.version },
+        { cookie },
+      )
+    ).status,
+    409,
+  );
+  const mergedData = {
+    ...mergeState.published.data,
+    description: "Preserved local description",
+  };
+  assert.equal(
+    (
+      await post(
+        rebasePath + "/merge",
+        {
+          version: rebaseDraft.version + 1,
+          postVersion: mergeState.published.version,
+          data: mergedData,
+        },
+        { cookie },
+      )
+    ).status,
+    409,
+  );
+  assert.equal(
+    (await (await get(rebasePath, { headers: { cookie } })).json()).baseVersion,
+    rebaseDraft.baseVersion,
+    "Failed draft CAS must roll back its publication baseline update",
+  );
+  assert.equal(
+    (
+      await post(
+        rebasePath + "/merge",
+        {
+          version: rebaseDraft.version,
+          postVersion: mergeState.published.version - 1,
+          data: mergedData,
+        },
+        { cookie },
+      )
+    ).status,
+    409,
+  );
+  const merged = await post(
+    rebasePath + "/merge",
+    {
+      version: rebaseDraft.version,
+      postVersion: mergeState.published.version,
+      data: mergedData,
+    },
+    { cookie },
+  );
+  assert.equal(merged.status, 200, await merged.clone().text());
+  const mergedDraft = await merged.json();
+  const mergedPublished = await post(
+    rebasePath + "/publish",
+    { version: mergedDraft.version },
+    { cookie },
+  );
+  assert.equal(
+    mergedPublished.status,
+    200,
+    await mergedPublished.clone().text(),
+  );
+  const finalMerged = await mergedPublished.json();
+  assert.equal(finalMerged.title, "Updated English counterpart");
+  assert.equal(finalMerged.description, "Preserved local description");
+  const secondLogin = await post("/api/auth/login", { password });
+  const otherCookie = secondLogin.headers.get("set-cookie").split(";")[0];
+  assert.equal(
+    (await post("/api/auth/passkey", { action: "revoke-sessions" }, { cookie }))
+      .status,
+    200,
+  );
+  assert.equal(
+    (await get("/api/posts", { headers: { cookie: otherCookie } })).status,
+    401,
+  );
   const logout = await post("/api/auth/logout", {}, { cookie });
   assert.equal(logout.status, 200);
   assert.ok(logout.headers.get("set-cookie").startsWith(sessionName + "="));

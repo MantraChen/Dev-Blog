@@ -44,6 +44,7 @@ export const onRequest = defineMiddleware(
     } else {
       const rate =
         limitedPaths.has(path) ||
+        path.startsWith("/cards/") ||
         (path === "/blog" && url.searchParams.has("q"))
           ? publicLimits.check(getClientIp(clientAddress))
           : null;
@@ -87,7 +88,12 @@ export const onRequest = defineMiddleware(
     // The adapter aborts oversized streams; never reuse that partially consumed connection.
     if (response.status === 413) response.headers.set("Connection", "close");
     response.headers.set("X-Frame-Options", "DENY");
-    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    response.headers.set(
+      "Referrer-Policy",
+      path.startsWith("/share")
+        ? "no-referrer"
+        : "strict-origin-when-cross-origin",
+    );
     response.headers.set(
       "Permissions-Policy",
       "camera=(), microphone=(), geolocation=()",
@@ -101,12 +107,13 @@ export const onRequest = defineMiddleware(
     );
     if (
       path.startsWith("/admin") ||
+      path.startsWith("/share") ||
       path.startsWith("/api/") ||
       response.status >= 400
     ) {
       response.headers.set("Cache-Control", "private, no-store");
     }
-    if (path.startsWith("/admin"))
+    if (path.startsWith("/admin") || path.startsWith("/share"))
       response.headers.set("X-Robots-Tag", "noindex, nofollow");
     if (url.protocol === "https:") {
       response.headers.set(

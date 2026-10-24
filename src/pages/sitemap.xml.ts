@@ -37,6 +37,7 @@ export const GET: APIRoute = async ({ site }) => {
     { url: "/series", priority: "0.8" },
     { url: "/now", priority: "0.6" },
     { url: "/review", priority: "0.6" },
+    { url: "/subscribe", priority: "0.6" },
     ...extra.map((url) => ({ url, priority: "0.6" })),
   ];
 

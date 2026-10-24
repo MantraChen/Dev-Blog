@@ -167,6 +167,10 @@ export async function getPublishedPosts(limit = 20): Promise<PostItem[]> {
   return db
     .select({
       id: posts.id,
+      version: posts.version,
+      language: posts.language,
+      translationKey: posts.translationKey,
+      category: posts.category,
       title: posts.title,
       slug: posts.slug,
       description: posts.description,
@@ -190,6 +194,10 @@ export async function getAllPosts(summary = false): Promise<PostItem[]> {
   return db
     .select({
       id: posts.id,
+      version: posts.version,
+      language: posts.language,
+      translationKey: posts.translationKey,
+      category: posts.category,
       title: posts.title,
       slug: posts.slug,
       description: posts.description,
@@ -218,6 +226,10 @@ export async function getPublishedPostMetadata() {
   return db
     .select({
       id: posts.id,
+      version: posts.version,
+      language: posts.language,
+      translationKey: posts.translationKey,
+      category: posts.category,
       slug: posts.slug,
       title: posts.title,
       description: posts.description,
@@ -238,6 +250,8 @@ export async function getPublicPostPage(
     page?: number;
     year?: string;
     series?: string;
+    language?: string;
+    category?: string;
   } = {},
 ) {
   const query = (options.query || "").trim().slice(0, 200);
@@ -249,6 +263,8 @@ export async function getPublicPostPage(
       page: options.page,
       year: options.year,
       series: options.series,
+      language: options.language,
+      category: options.category,
     };
     const result =
       sqlite.name === ":memory:"
@@ -270,6 +286,12 @@ export async function getPublicPostPage(
   }
   const condition = and(
     publicPosts,
+    options.language
+      ? eq(posts.language, options.language.slice(0, 20))
+      : undefined,
+    options.category
+      ? eq(posts.category, options.category.slice(0, 60))
+      : undefined,
     options.year && /^\d{4}$/.test(options.year)
       ? sql`substr(${posts.publishedAt},1,4)=${options.year}`
       : undefined,
@@ -343,6 +365,10 @@ export async function getPostBySlug(slug: string): Promise<PostItem | null> {
   const rows = await db
     .select({
       id: posts.id,
+      version: posts.version,
+      language: posts.language,
+      translationKey: posts.translationKey,
+      category: posts.category,
       title: posts.title,
       slug: posts.slug,
       description: posts.description,
@@ -401,6 +427,12 @@ export function updatePost(id: number, data: Partial<NewPost>) {
 export async function deletePost(id: number) {
   return sqlite
     .transaction(() => {
+      // Revocation survives a later restoration from Trash.
+      sqlite
+        .prepare(
+          "DELETE FROM preview_shares WHERE draftId IN (SELECT id FROM post_drafts WHERE postId=?)",
+        )
+        .run(id);
       sqlite
         .prepare(
           "UPDATE post_schedules SET status='cancelled',error='Article moved to Trash.' WHERE draftId IN (SELECT id FROM post_drafts WHERE postId=?)",

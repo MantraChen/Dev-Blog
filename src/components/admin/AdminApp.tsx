@@ -8,8 +8,16 @@ import { TimelinePanel } from "./panels/TimelinePanel";
 import { FriendsPanel } from "./panels/FriendsPanel";
 import { StatsPanel } from "./panels/StatsPanel";
 import { ToolsPanel } from "./panels/ToolsPanel";
+import {
+  OperationsPanel,
+  SecurityPanel,
+  AssetsPanel,
+} from "./panels/OperationsPanels";
 
 type Tab =
+  | "operations"
+  | "security"
+  | "assets"
   | "blog"
   | "projects"
   | "statuses"
@@ -25,6 +33,9 @@ export function AdminApp() {
   const tabs: { value: Tab; label: string }[] = [
     { value: "blog", label: "Blog" },
     { value: "tools", label: "Content tools" },
+    { value: "assets", label: "Writing library" },
+    { value: "operations", label: "Site health" },
+    { value: "security", label: "Security" },
     { value: "projects", label: "Projects" },
     { value: "statuses", label: "Statuses" },
     { value: "skills", label: "Skills" },
@@ -54,6 +65,9 @@ export function AdminApp() {
 
       {activeTab === "blog" && <BlogPanel />}
       {activeTab === "tools" && <ToolsPanel />}
+      {activeTab === "assets" && <AssetsPanel />}
+      {activeTab === "operations" && <OperationsPanel />}
+      {activeTab === "security" && <SecurityPanel />}
       {activeTab === "projects" && <ProjectsPanel />}
       {activeTab === "statuses" && <StatusesPanel />}
       {activeTab === "skills" && <SkillsPanel />}

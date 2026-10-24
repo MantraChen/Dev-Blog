@@ -8,14 +8,22 @@ import {
 } from "../../scripts/full-backup.mjs";
 import { exclusiveWrite } from "./write-gate";
 import { HttpError } from "./http-error";
+import { localRetention } from "../../scripts/remote-backup.mjs";
+import {
+  operationsSettings,
+  operationsState,
+  assertNoRemoteOperation,
+} from "./operations";
 const paths = () => backupPaths(sqlite.name);
 export const backupList = () => listFullBackups(paths());
 export const backupCreate = () =>
   exclusiveWrite(() => createFullBackup(sqlite, paths()));
 export const backupInspect = (id: string) =>
   exclusiveWrite(() => inspectFullBackup(sqlite, paths(), id));
-export const backupRestore = (id: string, hash: string) =>
-  exclusiveWrite(() => restoreFullBackup(sqlite, paths(), id, hash));
+export const backupRestore = (id: string, hash: string) => {
+  assertNoRemoteOperation();
+  return exclusiveWrite(() => restoreFullBackup(sqlite, paths(), id, hash));
+};
 export function backupSettings() {
   return {
     enabled: sqlite
@@ -48,6 +56,9 @@ export async function automaticBackup() {
   await exclusiveWrite(async () => {
     try {
       await createFullBackup(sqlite, paths(), "daily");
+      const settings = operationsSettings();
+      if (settings.retention && !operationsState().running)
+        await localRetention(paths().root, settings.localKeep, true);
       sqlite
         .prepare(
           "INSERT OR REPLACE INTO site_settings(key,value) VALUES ('backupError','')",

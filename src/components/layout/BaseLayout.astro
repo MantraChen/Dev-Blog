@@ -13,12 +13,16 @@ interface Props {
   noIndex?: boolean;
   canonicalPath?: string;
   article?: { publishedAt: string; updatedAt?: string | null };
+  language?: string;
+  translations?: {language:string;slug:string}[];
 }
 
 const { title, description = "Systems programming, engineering experiments, and project notes by Howie Sun.", ogImage = "/icon-512.png", noIndex = false, canonicalPath, article } = Astro.props;
 const siteUrl = Astro.site || new URL("https://howielog.com/");
 const canonicalUrl = new URL(withBase(canonicalPath || Astro.url.pathname), siteUrl);
 const imageUrl = new URL(contentUrl(ogImage), siteUrl);
+const language=Astro.props.language||'en';
+const translations=Astro.props.translations||[];
 const isoDate = (value: string) => Number.isNaN(Date.parse(value)) ? undefined : new Date(value).toISOString();
 const articleData = article && {
   "@context": "https://schema.org", "@type": "BlogPosting", headline: title.replace(/ \| Blog$/, ""),
@@ -30,12 +34,13 @@ if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Ca
 ---
 
 <!doctype html>
-<html lang="en" class="dark">
+<html lang={language} class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
+    {translations.map(item=><link rel="alternate" hreflang={item.language} href={new URL(withBase(`/blog/${item.slug}`),siteUrl)}/>)}
     <link rel="alternate" type="application/rss+xml" title="Howie Sun — RSS" href={withBase("/rss.xml")} />
     {noIndex && <meta name="robots" content="noindex, nofollow" />}
 
@@ -72,7 +77,7 @@ if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Ca
           {new Date().getFullYear()} Howie Sun. Content licensed under CC BY-NC 4.0.</p>
         <a href={withBase("/admin")} class="hover:text-foreground transition-colors">Std::abort()</a>
       </div>
-      <div class="mx-auto mt-4 flex max-w-6xl flex-wrap items-center justify-center gap-5 px-4 text-sm"><a href={withBase('/series')}>Series</a><a href={withBase('/now')}>Now</a><a href={withBase('/review')}>Year in review</a><a href={withBase('/bookmarks')}>My bookmarks</a>{!Astro.url.pathname.startsWith(withBase('/admin'))&&<QuickSearch client:idle/>}</div>
+      <div class="mx-auto mt-4 flex max-w-6xl flex-wrap items-center justify-center gap-5 px-4 text-sm"><a href={withBase('/subscribe')}>Subscribe</a><a href={withBase('/series')}>Series</a><a href={withBase('/now')}>Now</a><a href={withBase('/review')}>Year in review</a><a href={withBase('/bookmarks')}>My bookmarks</a>{!Astro.url.pathname.startsWith(withBase('/admin'))&&<QuickSearch client:idle/>}</div>
     </footer>
 
     <button

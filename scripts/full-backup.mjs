@@ -252,6 +252,11 @@ export async function restoreFullBackup(db, paths, id, expectedHash) {
           "SELECT name,sql FROM main.sqlite_master WHERE type='trigger' AND sql IS NOT NULL",
         )
         .all();
+      // Authentication is current security state, not historical content.
+      const currentKeys = db.prepare("SELECT * FROM admin_passkeys").all();
+      const currentUser = db
+        .prepare("SELECT value FROM site_settings WHERE key='passkeyUserId'")
+        .get();
       db.transaction(() => {
         // Raw events and their lifetime aggregates are both in the snapshot.
         // Replaying insert triggers would count events twice or collide with
@@ -271,6 +276,29 @@ export async function restoreFullBackup(db, paths, id, expectedHash) {
         db.exec(
           "DELETE FROM admin_sessions; UPDATE post_schedules SET status='cancelled',error='Cancelled during backup restore; review and schedule again.' WHERE status='pending'",
         );
+        // Never resurrect revoked preview links, challenges or old authenticators.
+        // Preserve current passkeys and counters, rather than rolling them back.
+        db.exec(
+          "DELETE FROM auth_challenges; DELETE FROM admin_passkeys; DELETE FROM preview_shares; DELETE FROM site_settings WHERE key IN ('operationsSettings','operationsState','remoteLastAttempt','remoteLastSuccess','remoteLastCheck')",
+        );
+        const restoreKey = db.prepare(
+          "INSERT INTO admin_passkeys(id,publicKey,counter,transports,name,createdAt,lastUsedAt) VALUES (?,?,?,?,?,?,?)",
+        );
+        for (const key of currentKeys)
+          restoreKey.run(
+            key.id,
+            key.publicKey,
+            key.counter,
+            key.transports,
+            key.name,
+            key.createdAt,
+            key.lastUsedAt,
+          );
+        db.prepare("DELETE FROM site_settings WHERE key='passkeyUserId'").run();
+        if (currentUser)
+          db.prepare(
+            "INSERT INTO site_settings VALUES ('passkeyUserId',?)",
+          ).run(currentUser.value);
         if (db.pragma("foreign_key_check").length)
           throw new Error("Restore integrity check failed");
       }).immediate();

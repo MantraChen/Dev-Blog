@@ -8,7 +8,8 @@ const query = (Astro.url.searchParams.get("q") || "").trim().slice(0, 200)
 const tag = (Astro.url.searchParams.get("tag") || "").trim().slice(0, 50)
 const year=/^\d{4}$/.test(Astro.url.searchParams.get('year')||'')?Astro.url.searchParams.get('year')!:'';
 const series=(Astro.url.searchParams.get('series')||'').slice(0,100);
-const result = await getPublicPostPage({ query, tag,year,series, page: Number(Astro.url.searchParams.get("page") || 1) })
+const language=(Astro.url.searchParams.get("language")||"").slice(0,20),category=(Astro.url.searchParams.get("category")||"").slice(0,60);
+const result = await getPublicPostPage({ query, tag,year,series,language,category, page: Number(Astro.url.searchParams.get("page") || 1) })
 const metadata = await getPublishedPostMetadata()
 const tagCounts: Record<string, number> = Object.create(null)
 metadata.forEach(p => new Set(p.tags).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1 }))
@@ -17,6 +18,7 @@ const params = new URLSearchParams()
 if (query) params.set("q", query)
 if (tag) params.set("tag", tag)
 if(year)params.set('year',year);if(series)params.set('series',series);
+if(language)params.set("language",language);if(category)params.set("category",category);
 if (result.page > 1) params.set("page", String(result.page))
 const canonicalPath = "/blog" + (params.size ? "?" + params : "")
 ---
@@ -25,6 +27,6 @@ const canonicalPath = "/blog" + (params.size ? "?" + params : "")
   <div class="max-w-4xl mx-auto py-10 px-4 sm:px-6">
     <h1 class="text-3xl font-bold tracking-tight mb-8">Blog</h1>
     <TagFilter posts={result.posts.map(post=>toPostSummary(post,query))} tags={allTags} tagCounts={tagCounts}
-      initialQuery={query} initialTag={tag} initialYear={year} initialSeries={series} years={[...new Set(metadata.map(post=>post.publishedAt.slice(0,4)))].filter(year=>/^\d{4}$/.test(year)).sort().reverse()} seriesOptions={[...new Set(metadata.map(post=>post.series).filter(Boolean))] as string[]} initialPage={result.page} initialTotal={result.total} client:load />
+      initialLanguage={language} initialCategory={category} categories={[...new Set(metadata.map(post=>post.category).filter(Boolean))]} initialQuery={query} initialTag={tag} initialYear={year} initialSeries={series} years={[...new Set(metadata.map(post=>post.publishedAt.slice(0,4)))].filter(year=>/^\d{4}$/.test(year)).sort().reverse()} seriesOptions={[...new Set(metadata.map(post=>post.series).filter(Boolean))] as string[]} initialPage={result.page} initialTotal={result.total} client:load />
   </div>
 </BaseLayout>

@@ -31,18 +31,23 @@ Set `ADMIN_PASSWORD_HASH` in the **server process environment** before starting 
 - Anonymous views deduplicated by a keyed network identifier and 30-minute bucket; emoji reactions deduplicated per network, post and emoji during their 90-day retention window. Shared IPs can undercount; these are approximate analytics.
 - Giscus comments, locally served Geist/KaTeX fonts, dark/light themes, responsive layout and native page transitions.
 - FTS5 substring search for 3+ characters; shorter Chinese/other queries retain literal substring matching in a bounded worker, away from the HTTP event loop.
+- Publishing preflight, optional external link checks, reusable templates/snippets, revision diffs and three-way conflict merging.
+- Expiring draft snapshot links, generated share cards, multilingual article pairing and filtered RSS subscriptions.
+- Passkey sign-in, device session management, site health, encrypted restic backups and opt-in retention policies.
 
 ## Writing workflow
 
 Create or edit an article in **Admin → Blog**. Changes save after 800 ms of inactivity into a private working draft, including incomplete titles and slugs. **Publish article / Publish changes** validates and publishes the draft atomically. Existing public content stays unchanged while you edit. **Save draft & close** keeps it in the Working drafts list; **Discard draft** leaves the published article and its history intact. **Trash** retains the article, its working draft and history for 30 days. Restore from **Content tools → Trash** returns it as an unpublished draft; permanent deletion is explicit.
 
-Unsaved changes are also cached in this browser tab. After an interrupted connection or a refresh, reopen the same draft and choose the browser copy or the server copy. This is a recovery aid, not a backup: clearing site storage or closing a tab without restoring its session can make that copy unavailable. Save to the server before closing the browser. Signing out clears browser recovery copies; unsaved edits in the current editor require confirmation. Concurrent tabs cannot silently overwrite newer server drafts. On a conflict, download the working copy before reloading. If the published article itself changed, preserve your edits, discard the old working draft, and reopen the latest article.
+Unsaved changes are also cached in this browser tab. After an interrupted connection or a refresh, reopen the same draft and choose the browser copy or the server copy. This is a recovery aid, not a backup: clearing site storage or closing a tab without restoring its session can make that copy unavailable. Save to the server before closing the browser. Signing out clears browser recovery copies; unsaved edits in the current editor require confirmation. Concurrent tabs cannot silently overwrite newer server drafts. On a conflict, use **Compare and merge changes** to combine edits and resolve overlapping fields. This also handles a changed published article while its baseline remains in version history. If the baseline has expired, download the working copy before discarding the draft and reopening the latest article.
 
 Version history stores the latest 30 article versions, beginning with the current version when an existing article is first opened or updated. Autosaves update the working draft rather than adding history entries. Restoring a historical version replaces the working draft; publishing is still a separate action. At most 200 working drafts are allowed.
 
 Images accept still JPEG/PNG/WebP up to 8 MiB and 16,777,216 pixels. Uploads are decoded, metadata is stripped, and the result is compressed to WebP with a maximum edge of 2048 pixels. Original files are not retained. Uploads are private until referenced by a published article, project retrospective or the Now page; unlisted articles are still public to anyone with their link. Removing all published references revokes public access, but cannot recall copies already downloaded by visitors. Historical and unused files are retained for recovery; the media library can delete unused files after checking article, draft, revision, trash, project and Now references. Monitor disk usage. External image URLs retain their original host's access rules.
 
 See [the content platform guide](docs/CONTENT-PLATFORM.md) for all 13 additions, import limits, scheduling behavior, backups and restoration.
+
+See [publishing and operations](docs/PUBLISHING-OPERATIONS.md) for the next 10 additions, migration 009, passkeys, preview links, encrypted backup setup and operational limits. Configuration names and placeholders are in [.env.example](.env.example); set real secrets in the service environment or private files.
 
 ## Validation and CI
 
@@ -52,10 +57,12 @@ npm test
 npm run build
 # or the complete suite, including production HTTP validation:
 npm run verify
+# Root and /howielog builds, HTTP checks, 5,000-post regression and audit:
+npm run verify:all
 npm audit
 ```
 
-GitHub Actions runs checks, regression tests and builds on Linux and Windows. Windows tests exercise deployment control flow with mocked NSSM operations; production service management requires server validation.
+GitHub Actions is configured for checks, regression tests and builds on Linux and Windows, plus a guarded Linux systemd/Caddy recovery rehearsal. Current cloud execution is blocked by the account's billing lock; see [the review](docs/REVIEW.md) for actual validation results. Windows tests exercise deployment control flow with mocked NSSM operations; production service management requires server validation.
 
 Security controls include streamed JSON body limits, schema validation, session cookies, same-origin mutation checks, bounded SQLite-backed rate limits shared across local processes, strict hash-based script CSP, no-store admin/API responses, Markdown sanitization and signed deployment webhooks. A dependency audit is one input to review, not proof of complete security.
 

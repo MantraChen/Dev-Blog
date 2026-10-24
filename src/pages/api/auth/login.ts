@@ -1,5 +1,11 @@
 import type { APIRoute } from "astro";
-import { login, makeSessionCookie, checkRateLimit, clearRateLimit, getClientIp } from "@/lib/auth";
+import {
+  login,
+  makeSessionCookie,
+  checkRateLimit,
+  clearRateLimit,
+  getClientIp,
+} from "@/lib/auth";
 import { createAuditLog } from "@/db/queries";
 import { loginSchema, safeParseBody } from "@/lib/validation";
 
@@ -10,7 +16,9 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   const rateCheck = checkRateLimit(ip);
   if (!rateCheck.allowed) {
     return new Response(
-      JSON.stringify({ error: `Too many attempts. Try again in ${rateCheck.retryAfterSeconds}s` }),
+      JSON.stringify({
+        error: `Too many attempts. Try again in ${rateCheck.retryAfterSeconds}s`,
+      }),
       {
         status: 429,
         headers: {
@@ -29,7 +37,10 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     });
   }
 
-  const sessionId = await login(parsed.data.password);
+  const sessionId = await login(
+    parsed.data.password,
+    request.headers.get("user-agent") || "Unknown device",
+  );
 
   if (!sessionId) {
     await createAuditLog({ action: "login.failed", ip });

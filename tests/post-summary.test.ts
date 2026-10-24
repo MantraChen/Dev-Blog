@@ -5,6 +5,10 @@ import type { PostItem } from "../src/db/types";
 
 test("public list and search summaries retain covers and reading time but exclude full content", () => {
   const post: PostItem = {
+    version: 1,
+    language: "zh-CN",
+    translationKey: null,
+    category: "",
     id: 1,
     slug: "test",
     title: "Test",

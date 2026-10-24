@@ -36,11 +36,23 @@ if (isAuthenticated) {
           Login
         </button>
       </form>
+      <button id="passkey-login" type="button" class="w-full rounded border px-4 py-2 text-sm">Sign in with a passkey</button>
     </div>
   </div>
 
   <script>
     import { withBase } from "@/lib/site-path";
+    document.getElementById('passkey-login')!.addEventListener('click',async(event)=>{
+      const button=event.currentTarget as HTMLButtonElement,error=document.getElementById('error-msg')!;
+      button.disabled=true;error.classList.add('hidden');
+      try {
+        const {startAuthentication}=await import('@simplewebauthn/browser');
+        const send=async(data:unknown)=>{const response=await fetch(withBase('/api/auth/passkey'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await response.json();if(!response.ok)throw new Error(result.error||'Passkey sign-in failed');return result;};
+        const options=await send({action:'login-options'});
+        const response=await startAuthentication({optionsJSON:options.options});
+        await send({action:'login-verify',challengeId:options.challengeId,response});location.href=withBase('/admin');
+      }catch(e){error.textContent=e instanceof Error?e.message:'Passkey sign-in failed';error.classList.remove('hidden');}finally{button.disabled=false;}
+    });
     document.getElementById('login-form')!.addEventListener('submit', async (e) => {
       e.preventDefault();
       const password = (document.getElementById('password') as HTMLInputElement).value;

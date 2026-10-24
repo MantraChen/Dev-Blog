@@ -152,6 +152,9 @@ export function parseMarkdown(source: string, name = "article.md") {
     slug: metadata.slug || slugifyPostTitle(title, fallback),
     content,
     description: metadata.description || "",
+    language: metadata.language || "zh-CN",
+    translationKey: metadata.translationKey || "",
+    category: metadata.category || "",
     tags: Array.isArray(metadata.tags)
       ? metadata.tags.join(", ")
       : String(metadata.tags || ""),
@@ -345,6 +348,9 @@ export async function exportArticle(id: number) {
         coverImage: local(data.coverImage),
         series: data.series,
         seriesOrder: data.seriesOrder,
+        language: data.language,
+        translationKey: data.translationKey,
+        category: data.category,
         publishedAt: data.publishedAt,
       }) +
       "---\n\n" +

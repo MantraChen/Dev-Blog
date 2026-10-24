@@ -8,6 +8,8 @@ import { ReactionBar } from "@/components/blog/ReactionBar"
 import { ReaderTools } from '@/components/blog/ReaderTools';
 import { resolveAlias } from '@/db/aliases';
 import { seriesChapters,relatedPosts,backlinks } from '@/db/content';
+import { translations } from '@/db/publishing';
+import { languages } from '@/lib/languages';
 
 const { slug } = Astro.params
 
@@ -19,6 +21,7 @@ if (!post || post.draft) {
   return Astro.rewrite(withBase("/404"))
 }
 const chapters=post.series?seriesChapters(post.series):[];
+const versions=post.hidden?[]:translations(post.translationKey);
 const chapterIndex=chapters.findIndex(item=>item.id===post.id);
 const related=post.hidden?[]:relatedPosts(post.id), references=post.hidden?[]:backlinks(post.id,post.slug);
 
@@ -52,7 +55,7 @@ const publishedDate = new Date(post.publishedAt)
 Astro.response.headers.set('Cache-Control', post.hidden ? 'private, no-store' : 'no-cache')
 ---
 
-<BaseLayout title={`${post.title} | Blog`} description={description} ogImage={post.coverImage || undefined} noIndex={post.hidden} article={{ publishedAt: post.publishedAt, updatedAt: post.updatedAt }}>
+<BaseLayout title={`${post.title} | Blog`} description={description} ogImage={post.hidden?post.coverImage||undefined:`/cards/${post.slug}.png`} noIndex={post.hidden} language={post.language} translations={versions} article={{ publishedAt: post.publishedAt, updatedAt: post.updatedAt }}>
   <div id="reading-progress"></div>
 
   <div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 flex gap-10">
@@ -109,6 +112,7 @@ Astro.response.headers.set('Cache-Control', post.hidden ? 'private, no-store' : 
       </header>
 
       <ReaderTools id={post.id} slug={post.slug} title={post.title} client:load />
+      <div class="mb-6 flex flex-wrap gap-4 text-sm">{versions.length>1&&versions.map(item=><a class="underline" lang={item.language} hreflang={item.language} aria-current={item.slug===post.slug?'page':undefined} href={withBase(`/blog/${item.slug}`)}>{languages[item.language as keyof typeof languages]||item.language}</a>)}{!post.hidden&&<a class="underline" href={withBase(`/cards/${post.slug}.png?download=1`)} download>Download share card</a>}<a class="underline" href={withBase('/subscribe')}>Subscribe to topics</a></div>
       {chapters.length>0&&<details class="mb-6 rounded border p-4"><summary class="cursor-pointer text-sm font-medium">Series reading path · {chapterIndex>=0?`Chapter ${chapterIndex+1} of ${chapters.length}`:''}</summary><a class="my-3 block text-sm underline" href={withBase(`/series/${encodeURIComponent(post.series!)}`)}>Series introduction</a><ol class="space-y-2 text-sm">{chapters.map((chapter,index)=><li><a aria-current={chapter.id===post.id?'page':undefined} class={chapter.id===post.id?'font-bold':'underline'} href={withBase(`/blog/${chapter.slug}`)}>{index+1}. {chapter.title}</a></li>)}</ol><div class="mt-4 flex justify-between gap-3">{chapterIndex>0?<a class="text-sm underline" href={withBase(`/blog/${chapters[chapterIndex-1].slug}`)}>← Previous chapter</a>:<span/>}{chapterIndex>=0&&chapterIndex<chapters.length-1&&<a class="text-sm underline" href={withBase(`/blog/${chapters[chapterIndex+1].slug}`)}>Next chapter →</a>}</div></details>}
       <div class="article-body prose prose-zinc dark:prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:rounded-lg prose-lead:leading-relaxed">
         <Fragment set:html={htmlContent} />
