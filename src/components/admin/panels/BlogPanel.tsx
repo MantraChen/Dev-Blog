@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-}
+import { slugifyPostTitle } from "@/lib/post-slug";
 
 export function BlogPanel() {
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +13,7 @@ export function BlogPanel() {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [autoSlug, setAutoSlug] = useState(true);
+  const [fallbackSlug, setFallbackSlug] = useState("");
   const [coverImage, setCoverImage] = useState("");
 
   const load = useCallback(async () => {
@@ -40,9 +33,9 @@ export function BlogPanel() {
   // Auto-generate slug from title
   useEffect(() => {
     if (autoSlug && !editing) {
-      setSlug(slugify(title));
+      setSlug(title ? slugifyPostTitle(title, fallbackSlug) : "");
     }
-  }, [title, autoSlug, editing]);
+  }, [title, autoSlug, editing, fallbackSlug]);
 
   const startEdit = (post: any) => {
     setEditing(post);
@@ -56,6 +49,7 @@ export function BlogPanel() {
   };
 
   const startNew = () => {
+    setFallbackSlug(`post-${crypto.randomUUID()}`);
     setEditing(null);
     setTitle("");
     setSlug("");

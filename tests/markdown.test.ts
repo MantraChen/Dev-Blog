@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { renderMarkdown } from "../src/lib/markdown";
+import { slugifyPostTitle } from "../src/lib/post-slug";
 
 test("Markdown cannot emit executable link or image protocols", () => {
   const cases = ["[x](javascript:alert%281%29)", "[x](jav&#x61;script:alert%281%29)",
@@ -25,4 +26,17 @@ test("sanitizing preserves syntax highlighting, accessible math and SVG geometry
 
 test("untrusted KaTeX commands cannot create executable links", () => {
   assert.doesNotMatch(renderMarkdown("$\\href{javascript:alert(1)}{click}$"), /href="javascript:/i);
+});
+
+test("heading anchors support Chinese, repeated titles and colliding suffixes", () => {
+  const html = renderMarkdown("## 中文标题\n\n## 中文标题\n\n## Hello\n\n## Hello\n\n## Hello-1\n\n## !!!");
+  const ids = [...html.matchAll(/<h2 id="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(ids, ["中文标题", "中文标题-1", "hello", "hello-1", "hello-1-1", "section"]);
+  assert.match(renderMarkdown("## Hello"), /id="hello"/);
+  assert.match(renderMarkdown("## **Bold** and `code`"), /<strong>Bold<\/strong> and <code>code<\/code>/);
+});
+
+test("non-Latin post titles receive a stable valid fallback URL", () => {
+  assert.equal(slugifyPostTitle("中文标题", "post-abc123"), "post-abc123");
+  assert.equal(slugifyPostTitle("--- Hello world ---", "fallback"), "hello-world");
 });

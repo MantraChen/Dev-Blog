@@ -1,4 +1,4 @@
-import { marked } from "marked";
+import { Marked, Renderer } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import markedKatex from "marked-katex-extension";
@@ -7,24 +7,26 @@ import sanitizeHtml from "sanitize-html";
 // Generate slug from heading text
 function slugify(text: string): string {
   return text
+    .normalize("NFKC")
     .toLowerCase()
     .replace(/<[^>]+>/g, "")
-    .replace(/[^\w\s-]/g, "")
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
     .replace(/\s+/g, "-")
-    .trim();
+    .replace(/^-+|-+$/g, "") || "section";
 }
 
+function createMarkdownParser() {
+const marked = new Marked();
+const headingIds = new Set<string>();
 // Custom renderer to add IDs to headings (for TOC)
-const renderer = new marked.Renderer();
-renderer.heading = ({ tokens, depth }) => {
+const renderer = new Renderer();
+renderer.heading = function ({ tokens, depth }) {
   const text = tokens.map((t) => ("text" in t ? t.text : t.raw)).join("");
-  const id = slugify(text);
-  const escaped = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-  return `<h${depth} id="${id}">${escaped}</h${depth}>\n`;
+  const base = slugify(text);
+  let id = base;
+  for (let suffix = 1; headingIds.has(id); suffix++) id = `${base}-${suffix}`;
+  headingIds.add(id);
+  return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
 };
 
 // Sanitize raw HTML blocks — prevent XSS via markdown injection
@@ -58,12 +60,14 @@ marked.use({
   gfm: true,
   breaks: false,
 });
+return marked;
+}
 
 const dimension = /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:em|ex|px|pt|%|rem)?$/;
 
 /** Sanitize the complete generated document, including Markdown links and images. */
 export function renderMarkdown(content: string): string {
-  const html = marked.parse(content, { async: false });
+  const html = createMarkdownParser().parse(content, { async: false });
   return sanitizeHtml(html, {
     allowedTags: [...sanitizeHtml.defaults.allowedTags, "img", "input", "span",
       "math", "semantics", "annotation", "mrow", "mi", "mo", "mn", "ms", "mtext", "mspace",
