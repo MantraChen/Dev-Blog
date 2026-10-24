@@ -6,16 +6,20 @@ export const loginSchema = z.object({ password: z.string().min(1).max(1024) });
 
 /** Parse a route param as a positive integer, or return null */
 export function parseId(raw: string | undefined): number | null {
-  const id = parseInt(raw || "", 10);
-  return Number.isInteger(id) && id > 0 ? id : null;
+  if (!raw || !/^[1-9]\d*$/.test(raw)) return null;
+  const id = Number(raw);
+  return Number.isSafeInteger(id) ? id : null;
 }
 
 const httpUrl = z
-  .string()
   .url()
   .refine((u) => u.startsWith("http://") || u.startsWith("https://"), {
     message: "URL must start with http:// or https://",
   });
+
+const tags = z.array(z.string().trim().min(1).max(50)).max(20).transform(values => [...new Set(values)]);
+const publishedDate = z.union([z.iso.date(), z.iso.datetime({ offset: true })])
+  .transform(value => new Date(value).toISOString());
 
 // ─── Posts ───────────────────────────────────────────────────────────
 
@@ -30,11 +34,11 @@ export const createPostSchema = z.object({
   coverImage: httpUrl.nullable().default(null),
   series: z.string().max(100).nullable().default(null),
   content: z.string().max(500_000).default(""),
-  tags: z.array(z.string().max(50)).max(20).default([]),
+  tags: tags.default([]),
   featured: z.boolean().default(false),
   draft: z.boolean().default(true),
   hidden: z.boolean().default(false),
-  publishedAt: z.string().max(50).default(() => new Date().toISOString()),
+  publishedAt: publishedDate.default(() => new Date().toISOString()),
 });
 
 export const updatePostSchema = z.object({
@@ -48,11 +52,11 @@ export const updatePostSchema = z.object({
   coverImage: httpUrl.nullable(),
   series: z.string().max(100).nullable(),
   content: z.string().max(500_000),
-  tags: z.array(z.string().max(50)).max(20),
+  tags,
   featured: z.boolean(),
   draft: z.boolean(),
   hidden: z.boolean(),
-  publishedAt: z.string().max(50),
+  publishedAt: publishedDate,
 }).partial();
 
 // ─── Projects ───────────────────────────────────────────────────────
@@ -66,7 +70,12 @@ export const createProjectSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateProjectSchema = createProjectSchema.partial();
+export const updateProjectSchema = createProjectSchema.extend({
+  techStack: createProjectSchema.shape.techStack.removeDefault(),
+  demoUrl: createProjectSchema.shape.demoUrl.removeDefault(),
+  repoUrl: createProjectSchema.shape.repoUrl.removeDefault(),
+  sortOrder: createProjectSchema.shape.sortOrder.removeDefault(),
+}).partial();
 
 // ─── Skills ─────────────────────────────────────────────────────────
 
@@ -78,7 +87,11 @@ export const createSkillSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateSkillSchema = createSkillSchema.partial();
+export const updateSkillSchema = createSkillSchema.extend({
+  level: createSkillSchema.shape.level.removeDefault(),
+  iconSlug: createSkillSchema.shape.iconSlug.removeDefault(),
+  sortOrder: createSkillSchema.shape.sortOrder.removeDefault(),
+}).partial();
 
 // ─── Friends ────────────────────────────────────────────────────────
 
@@ -90,7 +103,11 @@ export const createFriendSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateFriendSchema = createFriendSchema.partial();
+export const updateFriendSchema = createFriendSchema.extend({
+  avatar: createFriendSchema.shape.avatar.removeDefault(),
+  description: createFriendSchema.shape.description.removeDefault(),
+  sortOrder: createFriendSchema.shape.sortOrder.removeDefault(),
+}).partial();
 
 // ─── Statuses ───────────────────────────────────────────────────────
 
@@ -114,13 +131,17 @@ export const createTimelineSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(1).max(2000),
   type: z.enum(timelineTypes),
-  date: z.string().min(1).max(50),
-  tags: z.array(z.string().max(50)).max(20).nullable().default(null),
+  date: z.iso.date(),
+  tags: tags.nullable().default(null),
   url: httpUrl.nullable().default(null),
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateTimelineSchema = createTimelineSchema.partial();
+export const updateTimelineSchema = createTimelineSchema.extend({
+  tags: createTimelineSchema.shape.tags.removeDefault(),
+  url: createTimelineSchema.shape.url.removeDefault(),
+  sortOrder: createTimelineSchema.shape.sortOrder.removeDefault(),
+}).partial();
 
 // ─── Reactions ──────────────────────────────────────────────────────
 
