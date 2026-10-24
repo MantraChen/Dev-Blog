@@ -34,3 +34,5 @@ deploy/*.log
 .claude/
 CLAUDE.md
 server-commands.txt
+/.releases/
+/.deploy.lock
