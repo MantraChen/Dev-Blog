@@ -3,6 +3,7 @@ import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import markedKatex from "marked-katex-extension";
 import sanitizeHtml from "sanitize-html";
+import { createHash } from "node:crypto";
 
 // Generate slug from heading text
 function slugify(text: string): string {
@@ -16,17 +17,17 @@ function slugify(text: string): string {
 }
 
 function createMarkdownParser() {
-const marked = new Marked();
-const headingIds = new Set<string>();
-// Custom renderer to add IDs to headings (for TOC)
-const renderer = new Renderer();
-renderer.heading = function ({ tokens, depth }) {
-  const text = tokens.map((t) => ("text" in t ? t.text : t.raw)).join("");
-  const base = slugify(text);
-  let id = base;
-  for (let suffix = 1; headingIds.has(id); suffix++) id = `${base}-${suffix}`;
-  headingIds.add(id);
-  return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
+  const marked = new Marked();
+  const headingIds = new Set<string>();
+  // Custom renderer to add IDs to headings (for TOC)
+  const renderer = new Renderer();
+  renderer.heading = function ({ tokens, depth }) {
+    const text = tokens.map((t) => ("text" in t ? t.text : t.raw)).join("");
+    const base = slugify(text);
+    let id = base;
+    for (let suffix = 1; headingIds.has(id); suffix++) id = `${base}-${suffix}`;
+    headingIds.add(id);
+    return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
 };
 
 // Sanitize raw HTML blocks — prevent XSS via markdown injection
@@ -44,10 +45,12 @@ marked.use(
   markedHighlight({
     langPrefix: "hljs language-",
     highlight(code, lang) {
-      if (lang && hljs.getLanguage(lang)) {
+      if (code.length <= 20_000 && lang && hljs.getLanguage(lang)) {
         return hljs.highlight(code, { language: lang }).value;
       }
-      return hljs.highlightAuto(code).value;
+      // Guessing among every grammar blocks the SSR event loop for long code blocks.
+      // marked escapes unchanged code before inserting it into HTML.
+      return code;
     },
   }),
 );
@@ -64,11 +67,21 @@ return marked;
 }
 
 const dimension = /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:em|ex|px|pt|%|rem)?$/;
+const cache = new Map<string, { html: string; bytes: number }>();
+const maxCacheBytes = 8 * 1024 * 1024;
+let cacheBytes = 0;
 
 /** Sanitize the complete generated document, including Markdown links and images. */
 export function renderMarkdown(content: string): string {
+  const key = createHash("sha256").update(content).digest("hex");
+  const cached = cache.get(key);
+  if (cached) {
+    cache.delete(key);
+    cache.set(key, cached);
+    return cached.html;
+  }
   const html = createMarkdownParser().parse(content, { async: false });
-  return sanitizeHtml(html, {
+  const sanitized = sanitizeHtml(html, {
     allowedTags: [...sanitizeHtml.defaults.allowedTags, "img", "input", "span",
       "math", "semantics", "annotation", "mrow", "mi", "mo", "mn", "ms", "mtext", "mspace",
       "mfrac", "msqrt", "mroot", "msup", "msub", "msubsup", "mover", "munder", "munderover",
@@ -111,4 +124,15 @@ export function renderMarkdown(content: string): string {
       img: sanitizeHtml.simpleTransform("img", { loading: "lazy", decoding: "async" }),
     },
   });
+  const bytes = Buffer.byteLength(sanitized, "utf8");
+  if (bytes <= maxCacheBytes) {
+    while (cache.size >= 32 || cacheBytes + bytes > maxCacheBytes) {
+      const oldest = cache.keys().next().value!;
+      cacheBytes -= cache.get(oldest)!.bytes;
+      cache.delete(oldest);
+    }
+    cache.set(key, { html: sanitized, bytes });
+    cacheBytes += bytes;
+  }
+  return sanitized;
 }

@@ -3,6 +3,15 @@ import assert from "node:assert/strict";
 import { renderMarkdown } from "../src/lib/markdown";
 import { slugifyPostTitle } from "../src/lib/post-slug";
 
+test("unknown languages and oversized code remain escaped and readable", () => {
+  for (const lang of ["unknown", "javascript"]) {
+    const body = '<script>alert("test")</script>\n'.repeat(1000);
+    const html = renderMarkdown(`\`\`\`${lang}\n${body}\`\`\``);
+    assert.doesNotMatch(html, /<script>/);
+    assert.match(html, /&lt;script&gt;/);
+  }
+});
+
 test("Markdown cannot emit executable link or image protocols", () => {
   const cases = ["[x](javascript:alert%281%29)", "[x](jav&#x61;script:alert%281%29)",
     "[x](data:text/html,hello)", "![x](javascript:alert%281%29)", "[x](vbscript:msgbox%281%29)"];
