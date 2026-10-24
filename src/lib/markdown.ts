@@ -2,6 +2,7 @@ import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import markedKatex from "marked-katex-extension";
+import sanitizeHtml from "sanitize-html";
 
 // Generate slug from heading text
 function slugify(text: string): string {
@@ -50,7 +51,7 @@ marked.use(
 );
 
 // KaTeX math rendering
-marked.use(markedKatex({ throwOnError: false }));
+marked.use(markedKatex({ throwOnError: false, trust: false, maxExpand: 1000, maxSize: 20 }));
 
 marked.use({
   renderer,
@@ -58,4 +59,52 @@ marked.use({
   breaks: false,
 });
 
-export { marked };
+const dimension = /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:em|ex|px|pt|%|rem)?$/;
+
+/** Sanitize the complete generated document, including Markdown links and images. */
+export function renderMarkdown(content: string): string {
+  const html = marked.parse(content, { async: false });
+  return sanitizeHtml(html, {
+    allowedTags: [...sanitizeHtml.defaults.allowedTags, "img", "input", "span",
+      "math", "semantics", "annotation", "mrow", "mi", "mo", "mn", "ms", "mtext", "mspace",
+      "mfrac", "msqrt", "mroot", "msup", "msub", "msubsup", "mover", "munder", "munderover",
+      "mtable", "mtr", "mtd", "mstyle", "mpadded", "mphantom", "menclose", "mglyph",
+      "svg", "path", "line"],
+    allowedAttributes: {
+      "*": ["class", "id", "aria-hidden"],
+      a: ["href", "title"],
+      img: ["src", "alt", "title", "width", "height", "loading", "decoding"],
+      input: ["type", "checked", "disabled"],
+      span: ["class", "style", "aria-hidden"],
+      math: ["xmlns", "display"],
+      annotation: ["encoding"],
+      mo: ["stretchy", "fence", "separator", "lspace", "rspace", "minsize", "maxsize"],
+      mspace: ["width", "height", "depth"],
+      mstyle: ["mathvariant", "displaystyle", "scriptlevel"],
+      mi: ["mathvariant"],
+      mtable: ["rowspacing", "columnalign", "columnspacing"],
+      mtd: ["columnalign"],
+      mpadded: ["width", "height", "depth", "lspace", "voffset"],
+      svg: ["xmlns", "width", "height", "viewBox", "preserveAspectRatio", "style"],
+      path: ["d"],
+      line: ["x1", "y1", "x2", "y2", "stroke", "stroke-width"],
+    },
+    allowedSchemes: ["http", "https", "mailto"],
+    allowedSchemesByTag: { img: ["http", "https"] },
+    allowProtocolRelative: false,
+    allowedStyles: { "*": {
+      height: [dimension], width: [dimension], "min-width": [dimension],
+      top: [dimension], left: [dimension], bottom: [dimension], right: [dimension],
+      "margin-left": [dimension], "margin-right": [dimension], "margin-top": [dimension],
+      "padding-left": [dimension], "padding-right": [dimension], "vertical-align": [dimension],
+      "border-bottom-width": [dimension], "border-top-width": [dimension],
+      position: [/^(?:relative|absolute)$/],
+      color: [/^(?:#[\da-f]{3,8}|[a-z]+|rgba?\([\d.,%\s]+\))$/i],
+    } },
+    parser: { lowerCaseTags: false, lowerCaseAttributeNames: false },
+    transformTags: {
+      input: (_tag, attributes) => ({ tagName: "input", attribs: { ...attributes, type: "checkbox", disabled: "" } }),
+      img: sanitizeHtml.simpleTransform("img", { loading: "lazy", decoding: "async" }),
+    },
+  });
+}

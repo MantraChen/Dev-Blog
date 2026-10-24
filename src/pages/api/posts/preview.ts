@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { validateSession } from "@/lib/auth";
-import { marked } from "@/lib/markdown";
+import { renderMarkdown } from "@/lib/markdown";
 import { previewSchema, safeParseBody } from "@/lib/validation";
 
 export const POST: APIRoute = async ({ request }) => {
@@ -15,7 +15,7 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const html = await marked.parse(parsed.data.content);
+  const html = renderMarkdown(parsed.data.content);
   return new Response(JSON.stringify({ html }), {
     headers: {
       "Content-Type": "application/json",
