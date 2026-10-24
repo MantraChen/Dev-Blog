@@ -11,6 +11,7 @@ const insert = sqlite.prepare("INSERT INTO posts(title, slug, draft) VALUES (?, 
 insert.run("Public", "public", 0);
 insert.run("Draft", "draft", 1);
 const context = (slug: string, cookie = "") => ({
+  clientAddress: "192.0.2.10",
   request: new Request("https://example.com/api/posts/views", { method: "POST", headers: { "content-type": "application/json", cookie }, body: JSON.stringify({ slug, emoji: "👍" }) }),
 }) as Parameters<typeof view>[0];
 
@@ -29,7 +30,9 @@ test("repeat visits are deduplicated and statistics survive slug changes", async
   assert.match(first.headers.get("set-cookie")!, /HttpOnly/);
   assert.match(first.headers.get("set-cookie")!, /Secure/);
   assert.equal((await view(context("public", cookie))).status, 200);
+  assert.equal((await view(context("public"))).status, 200);
   assert.equal(await queries.getPostViewCount("public"), 1);
+  assert.equal((await react(context("public"))).status, 201);
   assert.equal((await react(context("public"))).status, 201);
   const post = await queries.getPublicPostIdentity("public");
   await queries.updatePost(post!.id, { slug: "renamed" });

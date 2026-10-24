@@ -7,8 +7,17 @@ export default defineConfig({
   site: 'https://howielog.com',
   output: 'server',
   compressHTML: true,
+  markdown: { syntaxHighlight: false }, // Application Markdown uses sanitized highlight.js output.
   security: {
     checkOrigin: true,
+    csp: {
+      scriptDirective: { resources: ["'self'", 'https://giscus.app'] },
+      // KaTeX, reading progress and React components use style attributes.
+      styleDirective: { resources: ["'self'", "'unsafe-inline'"] },
+      directives: ["default-src 'self'", "img-src 'self' data: https:",
+        "font-src 'self' data:", "connect-src 'self'",
+        'frame-src https://giscus.app', "object-src 'none'", "base-uri 'self'", "form-action 'self'"],
+    },
     allowedDomains: [
       { protocol: 'https', hostname: 'howielog.com' },
       { protocol: 'http', hostname: 'localhost' },

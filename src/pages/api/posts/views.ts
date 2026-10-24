@@ -20,7 +20,7 @@ export const GET: APIRoute = async ({ url }) => {
   });
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, clientAddress }) => {
   const parsed = await safeParseBody(request, viewSchema);
   if (!parsed.success) {
     return new Response(JSON.stringify({ error: parsed.error }), {
@@ -31,7 +31,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   const post = await getPublicPostIdentity(parsed.data.slug);
   if (!post) return new Response(null, { status: 404 });
-  const visitor = getVisitor(request);
+  const visitor = getVisitor(request, clientAddress);
   await recordPostView(post.id, post.slug, visitor.key, visitor.bucket);
   const count = await getPostViewCount(parsed.data.slug);
 

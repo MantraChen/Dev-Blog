@@ -38,11 +38,11 @@ if (isAuthenticated) {
     </div>
   </div>
 
-  <script is:inline>
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
+  <script>
+    document.getElementById('login-form')!.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const password = document.getElementById('password').value;
-      const errorMsg = document.getElementById('error-msg');
+      const password = (document.getElementById('password') as HTMLInputElement).value;
+      const errorMsg = document.getElementById('error-msg')!;
       errorMsg.classList.add('hidden');
 
       try {

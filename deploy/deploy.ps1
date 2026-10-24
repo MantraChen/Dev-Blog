@@ -38,7 +38,7 @@ function Prepare-Release([string]$Root, [string]$Ref) {
         $oldRelease = $env:PUBLIC_RELEASE_ID
         try {
             $env:PUBLIC_RELEASE_ID = $commit
-            Invoke-Checked node @("-e", "const v=process.versions.node.split('.').map(Number); if(v[0]<22||(v[0]===22&&(v[1]<23||(v[1]===23&&v[2]<4)))) process.exit(1)")
+            Invoke-Checked node @("scripts/check-runtime.mjs")
             Invoke-Checked npm.cmd @("ci", "--no-fund")
             Invoke-Checked npm.cmd @("run", "verify")
             Invoke-Checked npm.cmd @("audit", "--omit=dev", "--audit-level=high")

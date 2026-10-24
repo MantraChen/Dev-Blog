@@ -45,7 +45,9 @@ const migrations = [{
       db.exec(`UPDATE posts SET ${field} = strftime('%Y-%m-%dT%H:%M:%fZ', ${field}) WHERE strftime('%Y-%m-%dT%H:%M:%fZ', ${field}) IS NOT NULL`);
     }
   },
-}];
+}, ...["005-search", "006-operational-state"].map(id => ({
+  id, up(db) { db.exec(readFileSync(new URL(`../migrations/${id}.sql`, import.meta.url), "utf8")); },
+}))];
 
 export function pendingMigrations(db) {
   const hasJournal = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'app_migrations'").get();

@@ -1,5 +1,6 @@
-import { and, asc, desc, eq, lt, gt, or, count, sql } from "drizzle-orm";
-import { db } from ".";
+import { and, asc, desc, eq, lt, gt, or, count, sql, inArray } from "drizzle-orm";
+import { db, sqlite } from ".";
+import { executeSearch, searchInWorker } from "../lib/post-search";
 import { projects, posts, postViews, statuses, skills, timeline, friends, reactions, adminSessions, auditLogs } from "./schema";
 import type {
   ProjectItem,
@@ -189,10 +190,14 @@ export async function getPublishedPostMetadata() {
 export async function getPublicPostPage(options: { query?: string; tag?: string; page?: number } = {}) {
   const query = (options.query || "").trim().slice(0, 200);
   const tag = (options.tag || "").trim().slice(0, 50);
-  // Escape LIKE metacharacters: '%' in a search is literal, not match-everything.
-  const pattern = "%" + query.replace(/[\\%_]/g, char => "\\" + char) + "%";
+  if (query) {
+    const parameters = { query, tag, page: options.page };
+    const result = sqlite.name === ":memory:" ? executeSearch(sqlite, parameters) : await searchInWorker(sqlite.name, parameters);
+    const items = result.ids.length ? await db.select().from(posts).where(and(publicPosts, inArray(posts.id, result.ids)))
+      .orderBy(desc(posts.publishedAt), desc(posts.id)) : [];
+    return { posts: items, total: result.total, page: result.page, pageSize: result.pageSize };
+  }
   const condition = and(publicPosts,
-    query ? sql`(${posts.title} LIKE ${pattern} ESCAPE '\\' OR ${posts.description} LIKE ${pattern} ESCAPE '\\' OR ${posts.content} LIKE ${pattern} ESCAPE '\\')` : undefined,
     tag ? sql`EXISTS (SELECT 1 FROM json_each(${posts.tags}) WHERE value = ${tag})` : undefined);
   const total = db.select({ count: count() }).from(posts).where(condition).get()!.count;
   const pageSize = 20;
@@ -264,12 +269,7 @@ export async function recordPostView(postId: number, slug: string, visitorKey: s
 }
 
 export async function getPostViewCount(slug: string): Promise<number> {
-  const rows = await db
-    .select({ count: count() })
-    .from(postViews)
-    .innerJoin(posts, eq(postViews.postId, posts.id))
-    .where(eq(posts.slug, slug));
-  return rows[0]?.count ?? 0;
+  return (sqlite.prepare("SELECT COALESCE(sum(v.views),0) AS n FROM post_view_daily v JOIN posts p ON p.id=v.postId WHERE p.slug=?").get(slug) as { n: number }).n;
 }
 
 // ─── Admin Sessions ──────────────────────────────────────────────────
@@ -333,50 +333,29 @@ export async function deleteFriend(id: number) {
 
 // ─── Reactions ──────────────────────────────────────────────────────
 
-export async function addReaction(postId: number, slug: string, emoji: string) {
-  return db.insert(reactions).values({ postId, slug, emoji });
+export async function addReaction(postId: number, slug: string, emoji: string, visitorKey: string) {
+  return db.insert(reactions).values({ postId, slug, emoji, visitorKey }).onConflictDoNothing();
 }
 
 export async function getReactionCounts(slug: string): Promise<Record<string, number>> {
-  const rows = await db
-    .select({ emoji: reactions.emoji, count: count() })
-    .from(reactions)
-    .innerJoin(posts, eq(reactions.postId, posts.id))
-    .where(eq(posts.slug, slug))
-    .groupBy(reactions.emoji);
-  return Object.fromEntries(rows.map((r) => [r.emoji, r.count]));
+  const rows = sqlite.prepare("SELECT r.emoji,r.count FROM reaction_totals r JOIN posts p ON p.id=r.postId WHERE p.slug=?").all(slug) as { emoji: string; count: number }[];
+  return Object.fromEntries(rows.map(row => [row.emoji,row.count]));
 }
 
 // ─── Stats ──────────────────────────────────────────────────────────
 
 export async function getTotalViews(): Promise<number> {
-  const rows = await db.select({ count: count() }).from(postViews).innerJoin(posts, eq(postViews.postId, posts.id));
-  return rows[0]?.count ?? 0;
+  return (sqlite.prepare("SELECT COALESCE(sum(views),0) AS n FROM post_view_daily").get() as { n: number }).n;
 }
 
 export async function getTopPosts(limit = 10) {
-  const rows = await db
-    .select({ slug: posts.slug, title: posts.title, views: count() })
-    .from(postViews)
-    .innerJoin(posts, eq(postViews.postId, posts.id))
-    .groupBy(posts.id)
-    .orderBy(desc(count()))
-    .limit(limit);
-  return rows;
+  return sqlite.prepare("SELECT p.slug,p.title,sum(v.views) AS views FROM post_view_daily v JOIN posts p ON p.id=v.postId GROUP BY p.id ORDER BY views DESC,p.id DESC LIMIT ?")
+    .all(Math.max(1,Math.min(limit,100))) as { slug: string; title: string; views: number }[];
 }
 
 export async function getViewsByDay(days = 30) {
-  const rows = await db
-    .select({
-      date: sql<string>`date(${postViews.createdAt})`.as("date"),
-      views: count(),
-    })
-    .from(postViews)
-    .innerJoin(posts, eq(postViews.postId, posts.id))
-    .where(sql`${postViews.createdAt} >= ${new Date(Date.now() - days * 86400_000).toISOString().replace("T", " ").slice(0, 19)}`)
-    .groupBy(sql`date(${postViews.createdAt})`)
-    .orderBy(sql`date(${postViews.createdAt})`);
-  return rows;
+  return sqlite.prepare("SELECT day AS date,sum(views) AS views FROM post_view_daily WHERE day >= ? AND day != 'unknown' GROUP BY day ORDER BY day")
+    .all(new Date(Date.now() - days * 86400_000).toISOString().slice(0,10)) as { date: string; views: number }[];
 }
 
 // ─── Series ─────────────────────────────────────────────────────────

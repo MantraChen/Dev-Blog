@@ -1,7 +1,7 @@
 export {};
 let cleanup = () => {};
 document.addEventListener("astro:before-swap", () => cleanup());
-document.addEventListener("astro:page-load", () => {
+function initializePage() {
   cleanup();
   const article = document.querySelector<HTMLElement>("[data-post-slug]");
   if (!article) return;
@@ -93,4 +93,7 @@ document.addEventListener("astro:page-load", () => {
     observers.forEach(observer => observer.disconnect());
     timers.forEach(clearTimeout);
   };
-});
+}
+initializePage();
+window.addEventListener("pageshow", event => { if (event.persisted) initializePage(); });
+window.addEventListener("pagehide", () => cleanup());

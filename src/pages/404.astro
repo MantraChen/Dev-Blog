@@ -492,6 +492,8 @@ Astro.response.headers.set("Cache-Control", "no-store")
 
     cleanup = () => { controller.abort(); themeObserver.disconnect(); cancelAnimationFrame(frame); };
     }
-    document.addEventListener("astro:page-load", initSpace);
+    initSpace();
+    window.addEventListener("pageshow", event => { if (event.persisted) initSpace(); });
+    window.addEventListener("pagehide", () => cleanup());
   </script>
 </BaseLayout>

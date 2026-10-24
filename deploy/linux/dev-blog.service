@@ -1,0 +1,28 @@
+[Unit]
+Description=Dev Blog
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=devblog
+Group=devblog
+WorkingDirectory=/opt/dev-blog/current
+EnvironmentFile=/etc/dev-blog.env
+ExecStartPre=/usr/bin/node scripts/check-runtime.mjs
+ExecStart=/usr/bin/node dist/server/entry.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dev-blog
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

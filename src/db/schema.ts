@@ -107,12 +107,15 @@ export const friends = sqliteTable("friends", {
 export const reactions = sqliteTable("reactions", {
   id: int().primaryKey({ autoIncrement: true }),
   postId: int().references(() => posts.id, { onDelete: "cascade" }),
+  visitorKey: text(),
   slug: text().notNull(),
   emoji: text().notNull(), // 👍 🎉 ❤️ 🚀 👀 🤔
   createdAt: text()
     .notNull()
     .default(sql`(datetime('now'))`),
-}, (table) => [index("reactions_post_emoji").on(table.postId, table.emoji)]);
+}, (table) => [index("reactions_post_emoji").on(table.postId, table.emoji),
+  uniqueIndex("reactions_visitor").on(table.postId, table.emoji, table.visitorKey),
+  index("reactions_created").on(table.createdAt)]);
 
 // ─── Admin Sessions ──────────────────────────────────────────────────
 export const adminSessions = sqliteTable("admin_sessions", {

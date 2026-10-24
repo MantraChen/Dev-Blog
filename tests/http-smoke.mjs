@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { createHash } from "node:crypto";
 import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
 import { migrate } from "../scripts/migrate.mjs";
@@ -36,6 +37,18 @@ const get = async (path, options = {}) => {
   catch (error) { throw new Error(`${options.method || "GET"} ${path} failed. Server output:\n${output}`, { cause: error }); }
 };
 const post = (path, body, headers = {}) => get(path, { method: "POST", headers: { "Content-Type": "application/json", origin, ...headers }, body: JSON.stringify(body) });
+const checkScriptPolicy = async response => {
+  const policy = response.headers.get('content-security-policy');
+  const scriptPolicy = policy?.split(';').find(value => value.trim().startsWith('script-src '));
+  assert.ok(scriptPolicy, 'Astro must emit a script policy');
+  assert.doesNotMatch(scriptPolicy, /unsafe-inline|unsafe-eval/);
+  assert.match(policy, /frame-ancestors 'none'/);
+  for (const [,attrs,body] of (await response.clone().text()).matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
+    if (/\bsrc=|application\/ld\+json/.test(attrs) || !body.trim()) continue;
+    const hash = createHash('sha256').update(body).digest('base64');
+    assert.ok(scriptPolicy.includes(`'sha256-${hash}'`),'Rendered trusted inline script must match the CSP hash');
+  }
+};
 try {
   let ready = false;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -49,10 +62,13 @@ try {
     const response = await get(path);
     assert.equal(response.status, 200, path);
     assert.equal(response.headers.get("cache-control"), "no-cache", path);
+    await checkScriptPolicy(response);
   }
   for (const path of ["/blog/no-such-post", "/blog/draft", "/404"]) assert.equal((await get(path)).status, 404, path);
   const article = await get("/blog/public-1");
   assert.equal(article.status, 200);
+  await checkScriptPolicy(article);
+  await checkScriptPolicy(await get('/admin/login'));
   assert.equal(article.headers.get("cache-control"), "no-cache");
   const html = await article.text();
   assert.match(html, /property="og:type" content="article"/);
@@ -76,6 +92,8 @@ try {
   const visit = await post("/api/posts/views", { slug: "public-1" });
   const visitorCookie = visit.headers.get("set-cookie").split(";")[0];
   assert.equal((await (await post("/api/posts/views", { slug: "public-1" }, { cookie: visitorCookie })).json()).views, 1);
+  assert.equal((await (await post('/api/posts/views',{slug:'public-1'})).json()).views,1,'Cookie clearing must not inflate network-deduplicated views');
+  for (let i=0;i<2;i++) assert.equal((await (await post('/api/reactions',{slug:'public-1',emoji:'👍'})).json())['👍'],1);
   assert.equal((await get("/api/posts")).status, 401);
   assert.equal((await get("/admin", { headers: { cookie: "admin_session=%E0%A4%A" } })).status, 302);
   assert.equal((await post("/api/auth/login", { password }, { origin: "https://evil.example" })).status, 403);
@@ -84,6 +102,7 @@ try {
   assert.equal(login.status, 200, await login.clone().text());
   assert.match(login.headers.get("set-cookie"), /HttpOnly; Secure; SameSite=Strict/);
   const cookie = login.headers.get("set-cookie").split(";")[0];
+  await checkScriptPolicy(await get('/admin',{headers:{cookie}}));
   const admin = await get("/api/posts", { headers: { cookie } });
   assert.equal(admin.status, 200);
   assert.match(admin.headers.get("cache-control"), /no-store/);

@@ -1,7 +1,7 @@
 export {};
 let cleanup = () => {};
 document.addEventListener("astro:before-swap", () => cleanup());
-document.addEventListener("astro:page-load", () => {
+function initializePage() {
   cleanup();
   const controller = new AbortController();
   const observer = new IntersectionObserver(entries => {
@@ -22,4 +22,7 @@ document.addEventListener("astro:page-load", () => {
   }), { signal: controller.signal });
   onScroll();
   cleanup = () => { controller.abort(); observer.disconnect(); };
-});
+}
+initializePage();
+window.addEventListener("pageshow", event => { if (event.persisted) initializePage(); });
+window.addEventListener("pagehide", () => cleanup());

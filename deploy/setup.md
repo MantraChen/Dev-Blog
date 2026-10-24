@@ -2,7 +2,7 @@
 
 ## Runtime and service prerequisites
 
-Use Node.js **22.23.4 or newer** (Node 24 LTS recommended), npm, Git, NSSM and Caddy. Upgrade Node before deploying this branch. Run deployment under an account allowed to manage the blog service.
+Use **Node 24.22.1 or newer within Node 24** (recommended), npm, Git, NSSM and Caddy. Patched Node 22.23.4+ or 26.12.1+ within those majors also work. The install/build/deploy checks reject older patch levels and unsupported majors. Upgrade Node before deploying this branch. Run deployment under an account allowed to manage the blog service.
 
 Keep the database outside versioned releases. Before the first deployment, configure the blog's NSSM `AppEnvironmentExtra` with all of these values, preserving any existing settings:
 
@@ -56,3 +56,17 @@ Invoke-RestMethod http://127.0.0.1:4321/api/health
 ```
 
 This repository's tests simulate deployment failures without changing Windows services. They cannot verify a real server's NSSM permissions, Caddy configuration, disk capacity or backup recoverability.
+
+## Remaining-review fixes and operations
+
+Migrations 005/006 add an FTS5 index, shared rate-limit state, a database-local HMAC secret, daily views and reaction totals. Index creation needs temporary disk space and write downtime on first migration. Test the migration on a production backup and measure its duration before scheduling the maintenance window.
+
+Run `npm run doctor` under the service's environment to check runtime, explicit database path, loopback binding, password configuration, SQLite consistency, pending migrations, disk headroom and backups. It does not print password hashes or visitor identifiers. Missing values in an interactive shell do not prove NSSM is misconfigured; run with equivalent settings.
+
+Background retention deletes up to 2,000 eligible records per table every 15 minutes: views older than 30 days, reactions/audit records older than 90 days, and expired sessions/limits. Aggregates preserve lifetime counts. For initial historical backlog, preview with `npm run db:maintain`; apply with `npm run db:maintain -- --apply`, which creates and integrity-checks a backup before bounded cleanup. Check the reported remaining backlog. Keep off-host snapshots and manage old backup/release/log disk usage; the app never automatically deletes recovery backups.
+
+After retention has run, old code that counts only raw rows will show incomplete historical statistics. Prefer a rollback release supporting the aggregate tables; reverting the application does not restore deleted detail rows. Preserve the pre-migration backup, and never restore it over new writes without an explicit recovery decision.
+
+Rate-limit quotas now survive restart and are shared by processes using this same local database. This is not a multi-host design; never share the WAL database through SMB/NFS. Anonymous statistics use keyed IP deduplication, so shared NAT can undercount and rotating networks can still inflate counts. The Node port must remain inaccessible from the internet.
+
+For a future OS replacement, see [the environment assessment](../docs/ENVIRONMENT.md). The current PowerShell webhook deployment is Windows-only; the Linux candidate intentionally starts with manual staged releases.

@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { addReaction, getReactionCounts, getPublicPostIdentity } from "@/db/queries";
 import { reactionSchema, safeParseBody } from "@/lib/validation";
+import { getVisitor } from "@/lib/visitor";
 
 export const GET: APIRoute = async ({ url }) => {
   const slug = url.searchParams.get("slug");
@@ -18,7 +19,7 @@ export const GET: APIRoute = async ({ url }) => {
   });
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, clientAddress }) => {
   const parsed = await safeParseBody(request, reactionSchema);
   if (!parsed.success) {
     return new Response(JSON.stringify({ error: parsed.error }), {
@@ -29,11 +30,12 @@ export const POST: APIRoute = async ({ request }) => {
 
   const post = await getPublicPostIdentity(parsed.data.slug);
   if (!post) return new Response(null, { status: 404 });
-  await addReaction(post.id, post.slug, parsed.data.emoji);
+  const visitor = getVisitor(request, clientAddress);
+  await addReaction(post.id, post.slug, parsed.data.emoji, visitor.key);
   const counts = await getReactionCounts(parsed.data.slug);
 
   return new Response(JSON.stringify(counts), {
     status: 201,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "Set-Cookie": visitor.cookie },
   });
 };

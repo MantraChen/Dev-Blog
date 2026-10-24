@@ -204,7 +204,7 @@ Astro.response.headers.set('Cache-Control', post.hidden ? 'private, no-store' : 
         article.querySelectorAll('[data-post-views]').forEach(element => { element.textContent = String(views); });
       }).catch(() => { /* Reading remains available when analytics are offline. */ });
     }
-    document.addEventListener('astro:page-load', recordVisibleVisit);
+    recordVisibleVisit();
     document.addEventListener('visibilitychange', recordVisibleVisit);
   </script>
 </BaseLayout>

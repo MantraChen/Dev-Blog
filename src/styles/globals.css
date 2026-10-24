@@ -2,10 +2,16 @@
 @import "highlight.js/styles/github-dark.css";
 @plugin "@tailwindcss/typography";
 
+/* Native page transitions keep normal navigation and strict script CSP compatible. */
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Geist Variable', 'Inter', system-ui, -apple-system, sans-serif;
 
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
