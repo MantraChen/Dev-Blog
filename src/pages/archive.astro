@@ -1,4 +1,5 @@
 ---
+import { withBase } from "@/lib/site-path";
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getPublishedPostMetadata } from "@/db/queries"
 
@@ -35,7 +36,7 @@ const years = Object.keys(grouped).sort((a, b) => Number(b) - Number(a))
                   <time datetime={post.publishedAt} class="text-xs text-muted-foreground tabular-nums shrink-0 w-12">
                     {new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </time>
-                  <a href={`/blog/${post.slug}`} class="text-sm hover:text-primary transition-colors truncate" title={post.title}>
+                  <a href={withBase(`/blog/${post.slug}`)} class="text-sm hover:text-primary transition-colors truncate" title={post.title}>
                     {post.title}
                   </a>
                 </li>

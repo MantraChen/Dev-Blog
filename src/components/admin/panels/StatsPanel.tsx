@@ -1,3 +1,4 @@
+import { withBase } from "@/lib/site-path";
 import React, { useState, useEffect, useCallback } from "react";
 
 export function StatsPanel() {
@@ -7,7 +8,7 @@ export function StatsPanel() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/stats");
+      const res = await fetch(withBase("/api/stats"));
       if (!res.ok) throw new Error(res.status === 401 ? "Your session has expired. Please sign in again." : "Could not load statistics.");
       setStats(await res.json());
     } catch (error) {
@@ -20,7 +21,7 @@ export function StatsPanel() {
   if (error) return <div role="alert" className="space-y-3 text-sm">
     <p>{error}</p>
     <button onClick={load} className="rounded border px-3 py-2">Retry</button>
-    <a href="/admin/login" className="ml-3 underline">Sign in</a>
+    <a href={withBase("/admin/login")} className="ml-3 underline">Sign in</a>
   </div>;
 
   if (!stats) return (
@@ -65,7 +66,7 @@ export function StatsPanel() {
               <div key={post.slug} className="flex justify-between items-center text-sm">
                 <div className="flex gap-3 items-center truncate pr-4">
                   <span className="text-muted-foreground font-mono w-4">{index + 1}.</span>
-                  <a href={`/blog/${post.slug}`} target="_blank" rel="noreferrer" className="hover:underline truncate">
+                  <a href={withBase(`/blog/${post.slug}`)} target="_blank" rel="noreferrer" className="hover:underline truncate">
                     {post.title}
                   </a>
                 </div>

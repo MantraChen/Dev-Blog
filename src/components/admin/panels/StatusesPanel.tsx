@@ -1,3 +1,4 @@
+import { withBase } from "@/lib/site-path";
 import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
@@ -8,7 +9,7 @@ export function StatusesPanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/statuses?limit=50");
+      const res = await fetch(withBase("/api/statuses?limit=50"));
       if (res.ok) setItems(await res.json());
     } finally {
       setIsLoading(false);
@@ -21,7 +22,7 @@ export function StatusesPanel() {
     e.preventDefault();
     if (!text.trim()) return;
     try {
-      const res = await fetch("/api/statuses", {
+      const res = await fetch(withBase("/api/statuses"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -38,7 +39,7 @@ export function StatusesPanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this status?")) return;
     try {
-      const res = await fetch(`/api/statuses/${id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/statuses/${id}`), { method: "DELETE" });
       if (!res.ok) throw new Error();
       toast.success("Status deleted");
       load();

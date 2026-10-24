@@ -1,4 +1,5 @@
 ---
+import { withBase, contentUrl } from "@/lib/site-path";
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getLatestStatuses, getProjectList, getSkillList, getPublishedPosts } from "@/db/queries"
 import { estimateReadingTime } from "@/lib/utils"
@@ -65,16 +66,16 @@ const topSkills = skills.slice(0, 12)
     <section>
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-semibold tracking-tight">Recent Writing</h2>
-        <a href="/blog" class="text-sm font-medium hover:underline flex items-center text-muted-foreground hover:text-foreground transition-colors">
+        <a href={withBase("/blog")} class="text-sm font-medium hover:underline flex items-center text-muted-foreground hover:text-foreground transition-colors">
           View all <svg class="ml-1 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </a>
       </div>
       <div class="flex flex-col gap-4">
         {recentPosts.map((post) => (
-          <a href={`/blog/${post.slug}`} class="group flex flex-col rounded-lg border bg-card transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-sm dark:hover:shadow-zinc-800/50 hover:border-zinc-300 dark:hover:border-zinc-700 overflow-hidden">
+          <a href={withBase(`/blog/${post.slug}`)} class="group flex flex-col rounded-lg border bg-card transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-sm dark:hover:shadow-zinc-800/50 hover:border-zinc-300 dark:hover:border-zinc-700 overflow-hidden">
             {post.coverImage && (
               <img
-                src={post.coverImage}
+                src={contentUrl(post.coverImage)}
                 alt={post.title}
                 loading="lazy"
                 class="w-full h-28 sm:h-32 aspect-video object-cover border-b border-border bg-muted/50"
@@ -103,7 +104,7 @@ const topSkills = skills.slice(0, 12)
       <section>
         <div class="flex items-center justify-between mb-6">
           <h2 class="text-2xl font-semibold tracking-tight">Featured Projects</h2>
-          <a href="/projects" class="text-sm font-medium hover:underline flex items-center text-muted-foreground hover:text-foreground transition-colors">
+          <a href={withBase("/projects")} class="text-sm font-medium hover:underline flex items-center text-muted-foreground hover:text-foreground transition-colors">
             View all <svg class="ml-1 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
           </a>
         </div>

@@ -15,7 +15,7 @@ const database = join(directory, "test.db");
 const db = new Database(database);
 migrate(db);
 const insert = db.prepare("INSERT INTO posts(title, slug, content, description, tags, draft, hidden, coverImage, publishedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-for (let i = 1; i <= 25; i++) insert.run(`Public ${i}`, `public-${i}`, "## 中文标题\n\nHello world\n\n$$\\sqrt{x}$$", "Description", '["test"]', 0, 0, "https://howielog.com/icon-512.png", "2026-10-25T00:00:00.000Z");
+for (let i = 1; i <= 25; i++) insert.run(`Public ${i}`, `public-${i}`, "## 中文标题\n\nHello world\n\n[Related](https://howielog.com/blog/public-2?q=1#heading)\n\n![Legacy image](/icon-512.png)\n\n$$\\sqrt{x}$$", "Description", '["test"]', 0, 0, "https://howielog.com/icon-512.png", "2026-10-25T00:00:00.000Z");
 insert.run("Secret", "draft", "private", "", "[]", 1, 0, null, "2026-10-25T00:00:00.000Z");
 insert.run("Hidden", "hidden", "unlisted", "", "[]", 0, 1, null, "2026-10-25T00:00:00.000Z");
 db.close();
@@ -24,6 +24,15 @@ await once(portProbe, "listening");
 const port = portProbe.address().port;
 await new Promise(resolve => portProbe.close(resolve));
 const origin = `http://127.0.0.1:${port}`;
+const base = (process.env.PUBLIC_BASE_PATH || '/').replace(/\/+$/, '');
+const site = process.env.SITE_URL || 'https://howielog.com';
+const sessionName = base ? 'howielog_admin_session' : 'admin_session';
+const visitorName = base ? 'howielog_visitor' : 'blog_visitor';
+const checkLocalLinks = html => {
+  for (const [,url] of html.matchAll(/(?:href|src|action|component-url|renderer-url)="(\/[^"\s]*)"/g)) {
+    assert.ok(!base || url.startsWith(base + '/'), `URL escaped blog prefix: ${url}`);
+  }
+};
 const password = crypto.randomUUID();
 const child = spawn(process.execPath, ["dist/server/entry.mjs"], {
   env: { ...process.env, HOST: "127.0.0.1", PORT: String(port), DATABASE_PATH: database, ADMIN_PASSWORD_HASH: bcrypt.hashSync(password, 4) },
@@ -33,7 +42,7 @@ let output = "";
 child.stdout.on("data", chunk => { output += chunk; });
 child.stderr.on("data", chunk => { output += chunk; });
 const get = async (path, options = {}) => {
-  try { return await fetch(origin + path, { redirect: "manual", ...options }); }
+  try { return await fetch(origin + base + path, { redirect: "manual", ...options }); }
   catch (error) { throw new Error(`${options.method || "GET"} ${path} failed. Server output:\n${output}`, { cause: error }); }
 };
 const post = (path, body, headers = {}) => get(path, { method: "POST", headers: { "Content-Type": "application/json", origin, ...headers }, body: JSON.stringify(body) });
@@ -63,6 +72,7 @@ try {
     assert.equal(response.status, 200, path);
     assert.equal(response.headers.get("cache-control"), "no-cache", path);
     await checkScriptPolicy(response);
+    checkLocalLinks(await response.clone().text());
   }
   for (const path of ["/blog/no-such-post", "/blog/draft", "/404"]) assert.equal((await get(path)).status, 404, path);
   const article = await get("/blog/public-1");
@@ -71,6 +81,26 @@ try {
   await checkScriptPolicy(await get('/admin/login'));
   assert.equal(article.headers.get("cache-control"), "no-cache");
   const html = await article.text();
+  checkLocalLinks(html);
+  assert.ok(html.includes(`rel="canonical" href="${site}${base}/blog/public-1"`));
+  assert.ok(html.includes(`property="og:image" content="${site}${base}/icon-512.png"`));
+  assert.ok(html.includes(`href="${base}/blog/public-2?q=1#heading"`));
+  assert.ok(html.includes(`src="${base}/icon-512.png"`));
+  for (const path of ['/theme.js', '/favicon.svg', '/icon-512.png']) {
+    const asset = await get(path);
+    assert.equal(asset.status, 200, path);
+    assert.doesNotMatch(asset.headers.get('content-type'), /text\/html/);
+  }
+  const bundledAssets = new Set([...html.matchAll(/(?:src|href|component-url|renderer-url)="([^"\s]*\/_astro\/[^"\s]+)"/g)].map(match => match[1]));
+  assert.ok(bundledAssets.size > 0);
+  for (const asset of bundledAssets) assert.equal((await get(asset.slice(base.length))).status, 200, asset);
+  if (base) {
+    assert.equal((await fetch(origin + '/api/health', { redirect: 'manual' })).status, 404);
+    assert.ok(html.includes('data-storage-key="howielog:theme"'));
+  }
+  const robots = await (await get('/robots.txt')).text();
+  assert.ok(robots.includes(`Disallow: ${base}/admin`));
+  assert.ok(robots.includes(`Sitemap: ${site}${base}/sitemap.xml`));
   assert.match(html, /property="og:type" content="article"/);
   assert.match(html, /application\/ld\+json/);
   assert.match(html, /katex/);
@@ -85,22 +115,32 @@ try {
   assert.ok(results.every(post => post.readingTime >= 1 && post.coverImage && !("content" in post)));
   for (const path of ["/rss.xml", "/sitemap.xml"]) {
     const response = await get(path); assert.equal(response.status, 200);
-    assert.doesNotMatch(await response.text(), /\/blog\/(draft|hidden)/);
+    const xml = await response.text();
+    assert.doesNotMatch(xml, /\/blog\/(draft|hidden)/);
+    assert.ok(xml.includes(`${site}${base}/blog/public-1`));
+    if (base) assert.doesNotMatch(xml, /howielog\.com|dyyjs\.com\/blog\//);
   }
   assert.equal((await post("/api/posts/views", { slug: "draft" })).status, 404);
   assert.equal((await post("/api/reactions", { slug: "missing", emoji: "👍" })).status, 404);
   const visit = await post("/api/posts/views", { slug: "public-1" });
+  assert.ok(visit.headers.get('set-cookie').startsWith(visitorName + '='));
+  assert.ok(visit.headers.get('set-cookie').includes(`Path=${base}/;`));
   const visitorCookie = visit.headers.get("set-cookie").split(";")[0];
   assert.equal((await (await post("/api/posts/views", { slug: "public-1" }, { cookie: visitorCookie })).json()).views, 1);
   assert.equal((await (await post('/api/posts/views',{slug:'public-1'})).json()).views,1,'Cookie clearing must not inflate network-deduplicated views');
   for (let i=0;i<2;i++) assert.equal((await (await post('/api/reactions',{slug:'public-1',emoji:'👍'})).json())['👍'],1);
   assert.equal((await get("/api/posts")).status, 401);
-  assert.equal((await get("/admin", { headers: { cookie: "admin_session=%E0%A4%A" } })).status, 302);
+  const unauthorized = await get('/admin', { headers: { cookie: `${sessionName}=%E0%A4%A` } });
+  assert.equal(unauthorized.status, 302);
+  assert.equal(unauthorized.headers.get('location'), base + '/admin/login');
+  assert.match(unauthorized.headers.get('cache-control'), /no-store/);
   assert.equal((await post("/api/auth/login", { password }, { origin: "https://evil.example" })).status, 403);
   assert.equal((await get("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: "{" })).status, 400);
   const login = await post("/api/auth/login", { password });
   assert.equal(login.status, 200, await login.clone().text());
   assert.match(login.headers.get("set-cookie"), /HttpOnly; Secure; SameSite=Strict/);
+  assert.ok(login.headers.get('set-cookie').startsWith(sessionName + '='));
+  assert.ok(login.headers.get('set-cookie').includes(`Path=${base}/;`));
   const cookie = login.headers.get("set-cookie").split(";")[0];
   await checkScriptPolicy(await get('/admin',{headers:{cookie}}));
   const admin = await get("/api/posts", { headers: { cookie } });
@@ -113,11 +153,15 @@ try {
   const stream = new ReadableStream({ start(controller) { for (let i = 0; i < 18; i++) controller.enqueue(new Uint8Array(65536)); controller.close(); } });
   const large = await get("/api/posts/preview", { method: "POST", headers: { "content-type": "application/json", cookie, origin }, body: stream, duplex: "half" });
   assert.equal(large.status, 413);
-  assert.equal((await post("/api/auth/logout", {}, { cookie })).status, 200);
+  const logout = await post('/api/auth/logout', {}, { cookie });
+  assert.equal(logout.status, 200);
+  assert.ok(logout.headers.get('set-cookie').startsWith(sessionName + '='));
+  assert.ok(logout.headers.get('set-cookie').includes(`Path=${base}/;`));
   assert.equal((await get("/api/posts", { headers: { cookie } })).status, 401);
   for (let i = 0; i < 5; i++) await post("/api/auth/login", { password: "incorrect" });
   assert.equal((await post("/api/auth/login", { password: "incorrect" })).status, 429);
   assert.equal((await get("/api/health")).status, 200);
+  console.log(`Deployment tested: ${site}${base}/`);
   console.log("PASS: production HTTP smoke checks (pages, SEO, pagination, privacy, authentication, CSRF, payload limits, CRUD, views and rate limits)");
 } finally {
   const exited = once(child, "exit");

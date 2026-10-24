@@ -1,11 +1,13 @@
 # 接入朋友的 my_server
 
-本分支为向 [HaruharaZhang/my_server](https://github.com/HaruharaZhang/my_server) 提交适配 PR 做准备。服务器侧实现位于该仓库的 `z_my_server/dev-blog` 组件，博客应用沿用已经合并的 `bea1a01569b312ad1381497c1970fb809ea25594`，不要求先合并本说明分支。
+服务器侧适配见 [HaruharaZhang/my_server PR #13](https://github.com/HaruharaZhang/my_server/pull/13)，组件为 `z_my_server/dev-blog`。本分支提供支持子路径的博客源码；服务器仓库的 `source.json` 固定本分支的完整 commit，不需要先合并博客 main，也不自动跟随分支更新。
 
-适配保留 `howielog.com`、全部文章路径、管理功能和 SQLite，在朋友的 Linux / systemd / Caddy 环境中使用独立 Node 24.22.1+ 运行时、回环端口 4321、独立服务账户及持久数据目录。组件以完整源码 SHA 固定版本，接入朋友仓库的组件选择、部署台账、回退和 CI 必需检查；默认关闭，须服务器所有者完成配置与数据导入后显式启用。
+目标入口为 **https://dyyjs.com/howielog/**：文章 `/howielog/blog/<slug>`、后台 `/howielog/admin`、接口 `/howielog/api/*`、RSS `/howielog/rss.xml`。访问 `/howielog` 时由 Caddy 以 308 补齐尾部斜杠并保留查询参数。博客由该路径直接提供服务，不再跳往 howielog.com；已有文章 slug、管理功能和 SQLite 数据保留。
 
-服务器侧准备包含：构建和 HTTP 验证、数据库副本迁移演练、停服务后一致备份、精确版本健康检查、失败恢复代码与服务状态，以及 Caddy 追加片段和首次切换说明。数据库不会随代码回退被旧备份覆盖；域名、Caddy、DNS 和生产数据不会由准备分支自动修改。
+构建时设置 `SITE_URL=https://dyyjs.com`、`PUBLIC_BASE_PATH=/howielog`，在相同环境中执行 `npm run verify`。部署器及 CI 从 source.json 读取这两个设置。资源、导航、API、canonical、OG、RSS/sitemap 均包含前缀；旧 howielog.com 内容链接在展示时转换，不改数据库正文。Giscus 按去掉部署前缀后的原 pathname 查找评论；若评论仓库设置过来源白名单，需要允许新域名并在上线前验证已有评论。
 
-上线前按朋友仓库组件 README 完成 Linux CI、实际 systemd 权限检查、数据恢复演练、TLS/登录/搜索验收，再安排最终数据同步及 DNS 切换。当前 Windows 自动部署 webhook 保持暂停。
+后台与访客 Cookie 使用专属名称和 `/howielog/` Path，主题存储键改为 `howielog:theme`；迁移后需要重新登录。子路径并非浏览器同源安全隔离，共用域名的应用必须相互信任。共享根目录的 Service Worker、缓存和 robots.txt 规则由服务器所有者维护，博客不覆盖它们。
 
-本轮只准备本地分支、提交、补丁及 PR 文案；没有创建或发送 PR，没有推送朋友仓库，也没有触发部署。
+服务器运行环境为 Linux / systemd / 现有 Caddy，专用 Node 24.22.1+、回环端口 4321、独立服务账户和持久 SQLite 目录。组件默认关闭，配置、数据库导入及启用步骤以服务器组件 README 为准。准备包含构建及 HTTP 验证、数据库副本迁移演练、一致备份、精确版本健康检查和失败恢复；代码回退不会覆盖数据库新写入。
+
+Caddy 路由片段须导入现有 dyyjs.com 站点块，保留 `/howielog` 转发前缀及其他服务路由；robots 规则须合并到域名根目录文件。上线前完成 Linux CI、systemd 权限检查、数据恢复演练和 HTTPS/登录/搜索/评论验收，再在旧站暂停写入后同步最终数据。无需给 howielog.com 改 DNS；外部保存的旧域名链接只有在旧域名仍可提供 HTTP 服务时才能另外设置重定向。Windows 自动部署 webhook 保持暂停。

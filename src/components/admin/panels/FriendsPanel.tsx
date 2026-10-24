@@ -1,3 +1,4 @@
+import { withBase, contentUrl } from "@/lib/site-path";
 import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
@@ -9,7 +10,7 @@ export function FriendsPanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/friends");
+      const res = await fetch(withBase("/api/friends"));
       if (res.ok) setItems(await res.json());
     } finally {
       setIsLoading(false);
@@ -30,7 +31,7 @@ export function FriendsPanel() {
     };
 
     try {
-      const res = await fetch(editing ? `/api/friends/${editing.id}` : "/api/friends", {
+      const res = await fetch(withBase(editing ? `/api/friends/${editing.id}` : "/api/friends"), {
         method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -48,7 +49,7 @@ export function FriendsPanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this friend link?")) return;
     try {
-      const res = await fetch(`/api/friends/${id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/friends/${id}`), { method: "DELETE" });
       if (!res.ok) throw new Error();
       toast.success("Friend deleted");
       load();
@@ -108,7 +109,7 @@ export function FriendsPanel() {
             {items.map((f) => (
               <tr key={f.id} className="border-b">
                 <td className="py-2 font-medium flex items-center gap-2">
-                  {f.avatar && <img src={f.avatar} alt="" className="w-6 h-6 rounded-full object-cover" />}
+                  {f.avatar && <img src={contentUrl(f.avatar)} alt="" className="w-6 h-6 rounded-full object-cover" />}
                   {f.name}
                 </td>
                 <td className="py-2 text-muted-foreground">

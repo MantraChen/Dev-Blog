@@ -1,4 +1,5 @@
 ---
+import { withBase, contentUrl, THEME_STORAGE_KEY } from "@/lib/site-path";
 import "@/styles/globals.css"
 import "katex/dist/katex.min.css"
 import "@fontsource-variable/geist"
@@ -15,13 +16,13 @@ interface Props {
 
 const { title, description = "Systems programming, engineering experiments, and project notes by Howie Sun.", ogImage = "/icon-512.png", noIndex = false, canonicalPath, article } = Astro.props;
 const siteUrl = Astro.site || new URL("https://howielog.com/");
-const canonicalUrl = new URL(canonicalPath || Astro.url.pathname, siteUrl);
-const imageUrl = new URL(ogImage, siteUrl);
+const canonicalUrl = new URL(withBase(canonicalPath || Astro.url.pathname), siteUrl);
+const imageUrl = new URL(contentUrl(ogImage), siteUrl);
 const isoDate = (value: string) => Number.isNaN(Date.parse(value)) ? undefined : new Date(value).toISOString();
 const articleData = article && {
   "@context": "https://schema.org", "@type": "BlogPosting", headline: title.replace(/ \| Blog$/, ""),
   description, image: imageUrl.href, mainEntityOfPage: canonicalUrl.href,
-  author: { "@type": "Person", name: "Howie Sun", url: siteUrl.href },
+  author: { "@type": "Person", name: "Howie Sun", url: new URL(withBase("/"), siteUrl).href },
   datePublished: isoDate(article.publishedAt), dateModified: isoDate(article.updatedAt || article.publishedAt),
 };
 if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Cache-Control", "no-cache");
@@ -34,7 +35,7 @@ if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Ca
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
-    <link rel="alternate" type="application/rss+xml" title="Howie Sun — RSS" href="/rss.xml" />
+    <link rel="alternate" type="application/rss+xml" title="Howie Sun — RSS" href={withBase("/rss.xml")} />
     {noIndex && <meta name="robots" content="noindex, nofollow" />}
 
     <meta property="og:title" content={title} />
@@ -52,12 +53,12 @@ if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Ca
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={imageUrl} />
 
-    <link rel="icon" id="dynamic-favicon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" id="dynamic-favicon" type="image/svg+xml" href={withBase("/favicon.svg")} />
+    <link rel="apple-touch-icon" sizes="180x180" href={withBase("/apple-touch-icon.png")} />
 
     <title>{title}</title>
 
-    <script is:inline src="/theme.js"></script>
+    <script is:inline src={withBase("/theme.js")} data-storage-key={THEME_STORAGE_KEY}></script>
   </head>
   <body class="min-h-screen bg-background font-sans antialiased flex flex-col">
     <Nav />
@@ -68,7 +69,7 @@ if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Ca
       <div class="container mx-auto max-w-6xl px-4 flex justify-between items-center">
         <p>&copy;
           {new Date().getFullYear()} Howie Sun. Content licensed under CC BY-NC 4.0.</p>
-        <a href="/admin" class="hover:text-foreground transition-colors">Std::abort()</a>
+        <a href={withBase("/admin")} class="hover:text-foreground transition-colors">Std::abort()</a>
       </div>
     </footer>
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { THEME_STORAGE_KEY } from "@/lib/site-path";
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
@@ -14,7 +15,7 @@ export function ThemeToggle() {
     setTheme(nextTheme);
     document.documentElement.classList.add("theme-transition");
     document.documentElement.classList.toggle("dark", nextTheme === "dark");
-    try { localStorage.setItem("theme", nextTheme); } catch { /* Storage may be disabled. */ }
+    try { localStorage.setItem(THEME_STORAGE_KEY, nextTheme); } catch { /* Storage may be disabled. */ }
     setTimeout(() => {
       document.documentElement.classList.remove("theme-transition");
     }, 350);

@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { getPublishedPostMetadata } from "@/db/queries";
 import { escapeXml, feedDate } from "@/lib/feed-format";
+import { withBase } from "@/lib/site-path";
 
 export const GET: APIRoute = async ({ site }) => {
   const baseUrl = site?.toString().replace(/\/$/, "") || "https://example.com";
@@ -19,11 +20,11 @@ export const GET: APIRoute = async ({ site }) => {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${staticPages.map((p) => `  <url>
-    <loc>${escapeXml(baseUrl + p.url)}</loc>
+    <loc>${escapeXml(baseUrl + withBase(p.url))}</loc>
     <priority>${p.priority}</priority>
   </url>`).join("\n")}
 ${posts.map((post) => `  <url>
-    <loc>${escapeXml(baseUrl + "/blog/" + encodeURIComponent(post.slug))}</loc>
+    <loc>${escapeXml(baseUrl + withBase("/blog/" + encodeURIComponent(post.slug)))}</loc>
     ${feedDate(post.updatedAt || post.publishedAt) ? `<lastmod>${feedDate(post.updatedAt || post.publishedAt)}</lastmod>` : ""}
     <priority>0.8</priority>
   </url>`).join("\n")}

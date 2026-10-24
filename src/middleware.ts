@@ -2,6 +2,7 @@ import { defineMiddleware } from "astro:middleware";
 import { RateLimiter } from "./lib/rate-limit";
 import { sqlite } from "./db";
 import { getClientIp, isSameOriginMutation } from "./lib/request-security";
+import { BASE_PATH, withoutBase } from "./lib/site-path";
 
 const publicLimits = new RateLimiter(sqlite, "public", 60, 60_000);
 const limitedPaths = new Set(["/api/posts/search", "/api/posts/views", "/api/reactions"]);
@@ -10,9 +11,11 @@ const jsonError = (error: string, status: number, headers = {}) =>
 
 export const onRequest = defineMiddleware(async ({ request, clientAddress }, next) => {
   const url = new URL(request.url);
-  const path = url.pathname.replace(/\/+$/, "") || "/";
+  const path = withoutBase(url.pathname).replace(/\/+$/, "") || "/";
   let response: Response;
-  if (Number(request.headers.get("content-length")) > 1024 * 1024) {
+  if (BASE_PATH && url.pathname !== BASE_PATH && !url.pathname.startsWith(`${BASE_PATH}/`)) {
+    response = jsonError("Not found", 404);
+  } else if (Number(request.headers.get("content-length")) > 1024 * 1024) {
     response = jsonError("Request body too large", 413);
   } else if (path.startsWith("/api/") && !isSameOriginMutation(request)) {
     response = jsonError("Cross-origin requests are not allowed", 403);

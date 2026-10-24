@@ -1,4 +1,5 @@
 ---
+import { withBase } from "@/lib/site-path";
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 Astro.response.status = 404
 Astro.response.headers.set("Cache-Control", "no-store")
@@ -26,7 +27,7 @@ Astro.response.headers.set("Cache-Control", "no-store")
     <div id="msgBox" class="msg-box">
       <p class="msg-main" id="mainMsg">This page crossed the event horizon</p>
       <p class="msg-sub">Move your cursor around... carefully.</p>
-      <a id="homeBtn" class="home-btn" href="/">Take me home</a>
+      <a id="homeBtn" class="home-btn" href={withBase("/")}>Take me home</a>
     </div>
 
     <div id="spaghetti" class="spaghetti-overlay"></div>

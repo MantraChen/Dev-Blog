@@ -1,3 +1,4 @@
+import { withBase } from "@/lib/site-path";
 import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
@@ -9,7 +10,7 @@ export function ProjectsPanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/projects");
+      const res = await fetch(withBase("/api/projects"));
       if (res.ok) setItems(await res.json());
     } finally {
       setIsLoading(false);
@@ -31,7 +32,7 @@ export function ProjectsPanel() {
     };
 
     try {
-      const res = await fetch(editing ? `/api/projects/${editing.id}` : "/api/projects", {
+      const res = await fetch(withBase(editing ? `/api/projects/${editing.id}` : "/api/projects"), {
         method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -49,7 +50,7 @@ export function ProjectsPanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this project?")) return;
     try {
-      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/projects/${id}`), { method: "DELETE" });
       if (!res.ok) throw new Error();
       toast.success("Project deleted");
       load();

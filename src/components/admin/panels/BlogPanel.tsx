@@ -1,3 +1,4 @@
+import { withBase, contentUrl } from "@/lib/site-path";
 import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { slugifyPostTitle } from "@/lib/post-slug";
@@ -18,7 +19,7 @@ export function BlogPanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/posts");
+      const res = await fetch(withBase("/api/posts"));
       if (res.ok) setItems(await res.json());
       else toast.error("Failed to fetch posts");
     } catch {
@@ -77,7 +78,7 @@ export function BlogPanel() {
     };
 
     try {
-      const res = await fetch(editing ? `/api/posts/${editing.id}` : "/api/posts", {
+      const res = await fetch(withBase(editing ? `/api/posts/${editing.id}` : "/api/posts"), {
         method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -99,7 +100,7 @@ export function BlogPanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this post?")) return;
     try {
-      const res = await fetch(`/api/posts/${id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/posts/${id}`), { method: "DELETE" });
       if (!res.ok) throw new Error();
       toast.success("Post deleted");
       load();
@@ -123,7 +124,7 @@ export function BlogPanel() {
       message = "Post moved to drafts";
     }
     try {
-      const res = await fetch(`/api/posts/${post.id}`, {
+      const res = await fetch(withBase(`/api/posts/${post.id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(update),
@@ -141,7 +142,7 @@ export function BlogPanel() {
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch("/api/posts/preview", {
+        const res = await fetch(withBase("/api/posts/preview"), {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content }), signal: controller.signal,
         });
@@ -234,7 +235,7 @@ export function BlogPanel() {
             </div>
             {coverImage && (
               <div className="mt-2 rounded-md overflow-hidden border">
-                <img src={coverImage} alt="Cover preview" className="w-full h-32 object-cover" />
+                <img src={contentUrl(coverImage)} alt="Cover preview" className="w-full h-32 object-cover" />
               </div>
             )}
           </div>
@@ -337,7 +338,7 @@ export function BlogPanel() {
                 <td className="py-2 text-muted-foreground text-xs">{p.publishedAt?.split("T")[0]}</td>
                 <td className="py-2 text-right space-x-2">
                   {!p.draft && (
-                    <a href={`/blog/${p.slug}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 rounded border hover:bg-accent inline-block">{p.hidden ? "Direct Link" : "View"}</a>
+                    <a href={withBase(`/blog/${p.slug}`)} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 rounded border hover:bg-accent inline-block">{p.hidden ? "Direct Link" : "View"}</a>
                   )}
                   <button onClick={() => startEdit(p)} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
                   <button onClick={() => remove(p.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>

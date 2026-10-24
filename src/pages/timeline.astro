@@ -1,4 +1,5 @@
 ---
+import { contentUrl } from "@/lib/site-path";
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getTimelineList } from "@/db/queries"
 
@@ -127,7 +128,7 @@ const statsString = [
 
                     <h3 class="text-xl font-bold mb-2">
                       {item.url ? (
-                        <a href={item.url} target="_blank" rel="noreferrer" class="hover:text-primary transition-colors hover:underline decoration-primary/50 underline-offset-4">
+                        <a href={contentUrl(item.url)} target="_blank" rel="noreferrer" class="hover:text-primary transition-colors hover:underline decoration-primary/50 underline-offset-4">
                           {item.title}
                           <span class="inline-block ml-1 opacity-50 text-sm">↗</span>
                         </a>

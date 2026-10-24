@@ -1,10 +1,11 @@
 ---
+import { withBase } from "@/lib/site-path";
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { validateSession } from "@/lib/auth"
 
 const isAuthenticated = await validateSession(Astro.request.headers.get("cookie"))
 if (isAuthenticated) {
-  return Astro.redirect("/admin")
+  return Astro.redirect(withBase("/admin"))
 }
 ---
 
@@ -39,6 +40,7 @@ if (isAuthenticated) {
   </div>
 
   <script>
+    import { withBase } from "@/lib/site-path";
     document.getElementById('login-form')!.addEventListener('submit', async (e) => {
       e.preventDefault();
       const password = (document.getElementById('password') as HTMLInputElement).value;
@@ -46,14 +48,14 @@ if (isAuthenticated) {
       errorMsg.classList.add('hidden');
 
       try {
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch(withBase('/api/auth/login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ password }),
         });
 
         if (res.ok) {
-          window.location.href = '/admin';
+          window.location.href = withBase('/admin');
         } else {
           const data = await res.json();
           errorMsg.textContent = data.error || 'Login failed';

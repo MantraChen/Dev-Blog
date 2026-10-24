@@ -1,8 +1,9 @@
 ---
+import { withBase, withoutBase } from "@/lib/site-path";
 import { ThemeToggle } from "@/components/ThemeToggle"
 
 // 获取当前路径，用于链接高亮状态判断
-const pathname = new URL(Astro.request.url).pathname;
+const pathname = withoutBase(new URL(Astro.request.url).pathname);
 
 // 提取导航链接列表，便于统一维护和在两套菜单中渲染
 const navLinks = [
@@ -28,7 +29,7 @@ const isActive = (href: string) => {
     <nav class="hidden md:flex items-center space-x-6 text-sm font-medium">
       {navLinks.map((link) => (
         <a
-          href={link.href}
+          href={withBase(link.href)}
           class={`transition-colors hover:text-foreground/80 ${
             isActive(link.href) ? "text-foreground font-semibold" : "text-foreground/60"
           }`}
@@ -70,7 +71,7 @@ const isActive = (href: string) => {
     <nav class="flex flex-col px-4 py-3 space-y-2">
       {navLinks.map((link) => (
         <a
-          href={link.href}
+          href={withBase(link.href)}
           class={`flex items-center min-h-[44px] px-3 rounded-md transition-colors text-base font-medium ${
             isActive(link.href)
               ? "text-foreground font-semibold bg-foreground/10"

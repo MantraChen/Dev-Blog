@@ -1,3 +1,4 @@
+import { withBase, contentUrl } from "@/lib/site-path";
 import React, { useState, useEffect } from "react";
 
 import type { PostSummary } from "@/lib/post-summary";
@@ -31,7 +32,7 @@ export function TagFilter({ posts, tags, tagCounts, initialQuery, initialTag, in
     setIsSearching(true);
     const timer = setTimeout(async () => {
         try {
-          const res = await fetch(`/api/posts/search?${new URLSearchParams({ q: query, tag: activeTag || "", page: String(page) })}`, { signal: controller.signal });
+          const res = await fetch(withBase(`/api/posts/search?${new URLSearchParams({ q: query, tag: activeTag || "", page: String(page) })}`), { signal: controller.signal });
           if (!res.ok) throw new Error(res.status === 429 ? "Too many searches. Please try again shortly." : "Search failed. Please try again.");
           const data: PostSummary[] = await res.json();
           if (!controller.signal.aborted) {
@@ -52,11 +53,11 @@ export function TagFilter({ posts, tags, tagCounts, initialQuery, initialTag, in
   }, [searchQuery, activeTag, page, initialQuery, initialTag, initialPage, initialTotal]);
 
   const displayPosts = searchResults ?? posts;
-  const pageUrl = (number: number) => `/blog?${new URLSearchParams({ q: searchQuery.trim(), tag: activeTag || "", page: String(number) })}`;
+  const pageUrl = (number: number) => withBase(`/blog?${new URLSearchParams({ q: searchQuery.trim(), tag: activeTag || "", page: String(number) })}`);
 
   return (
     <div>
-      <form action="/blog" method="get" onSubmit={e => e.preventDefault()}>
+      <form action={withBase("/blog")} method="get" onSubmit={e => e.preventDefault()}>
       {activeTag && <input type="hidden" name="tag" value={activeTag} />}
       <input
         name="q"
@@ -135,12 +136,12 @@ export function TagFilter({ posts, tags, tagCounts, initialQuery, initialTag, in
               return (
                 <a
                   key={postSlug}
-                  href={`/blog/${postSlug}`}
+                  href={withBase(`/blog/${postSlug}`)}
                   className="group flex flex-col rounded-lg border transition-colors hover:bg-muted/50 overflow-hidden"
                 >
                   {post.coverImage && (
                     <img
-                      src={post.coverImage}
+                      src={contentUrl(post.coverImage)}
                       alt={post.title}
                       loading="lazy"
                       className="w-full h-32 aspect-video object-cover border-b border-border bg-muted/50"

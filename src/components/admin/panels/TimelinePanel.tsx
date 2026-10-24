@@ -1,3 +1,4 @@
+import { withBase } from "@/lib/site-path";
 import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
@@ -9,7 +10,7 @@ export function TimelinePanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/timeline");
+      const res = await fetch(withBase("/api/timeline"));
       if (res.ok) setItems(await res.json());
     } finally {
       setIsLoading(false);
@@ -32,7 +33,7 @@ export function TimelinePanel() {
     };
 
     try {
-      const res = await fetch(editing ? `/api/timeline/${editing.id}` : "/api/timeline", {
+      const res = await fetch(withBase(editing ? `/api/timeline/${editing.id}` : "/api/timeline"), {
         method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -50,7 +51,7 @@ export function TimelinePanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this entry?")) return;
     try {
-      const res = await fetch(`/api/timeline/${id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`/api/timeline/${id}`), { method: "DELETE" });
       if (!res.ok) throw new Error();
       toast.success("Entry deleted");
       load();

@@ -50,6 +50,8 @@ See [the Windows deployment guide](deploy/setup.md) and [Caddy example](deploy/C
 
 See [the environment assessment](docs/ENVIRONMENT.md) for the minimal-risk Linux alternative, and [the systemd template](deploy/linux/README.md) for a staged trial.
 
+For the shared server, see [the my_server adapter](deploy/my-server/README.md). Build with `SITE_URL=https://dyyjs.com` and `PUBLIC_BASE_PATH=/howielog` to serve the complete blog at `https://dyyjs.com/howielog/`. Both settings are build-time values; changing them requires rebuilding. Omitting them preserves the standalone `https://howielog.com/` deployment. CI tests both layouts on Linux and Windows.
+
 Deployment builds a new release with `npm ci` and verifies it before stopping the running service. It backs up and migrates SQLite, switches NSSM, checks the exact release and restores the previous service configuration on failure. Old releases and backups are retained for recovery; monitor their disk usage.
 
 Never use `drizzle-kit push --force` against production. Add versioned migrations to `scripts/migrate.mjs`; keep applied migrations immutable. Existing historical Drizzle SQL files are retained for baseline adoption and regression tests.

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { withBase } from "@/lib/site-path";
 
 interface UseCrudOptions {
   endpoint: string;
@@ -13,7 +14,7 @@ export function useCrud<T extends { id: number }>({ endpoint }: UseCrudOptions) 
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(endpoint);
+      const res = await fetch(withBase(endpoint));
       if (!res.ok) throw new Error(`Failed to load: ${res.status}`);
       setItems(await res.json());
     } catch (e) {
@@ -30,7 +31,7 @@ export function useCrud<T extends { id: number }>({ endpoint }: UseCrudOptions) 
     try {
       const url = id ? `${endpoint}/${id}` : endpoint;
       const method = id ? "PUT" : "POST";
-      const res = await fetch(url, {
+      const res = await fetch(withBase(url), {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -47,7 +48,7 @@ export function useCrud<T extends { id: number }>({ endpoint }: UseCrudOptions) 
   const remove = useCallback(async (id: number) => {
     setError(null);
     try {
-      const res = await fetch(`${endpoint}/${id}`, { method: "DELETE" });
+      const res = await fetch(withBase(`${endpoint}/${id}`), { method: "DELETE" });
       if (!res.ok) throw new Error((await res.json()).error || `Failed to delete: ${res.status}`);
       await load();
       return true;

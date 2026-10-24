@@ -3,10 +3,10 @@ const { compare } = pkg;
 import { RateLimiter } from "./rate-limit";
 import { sqlite } from "../db";
 import { parseSessionCookie } from "./request-security";
+import { COOKIE_PATH, SESSION_COOKIE } from "./site-path";
 export { getClientIp } from "./request-security";
 import { createAdminSession, getAdminSession, deleteAdminSession, cleanExpiredSessions } from "@/db/queries";
 
-const SESSION_COOKIE = "admin_session";
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // ─── Rate Limiting ──────────────────────────────────────────────────
@@ -64,9 +64,9 @@ export async function logout(cookieHeader: string | null): Promise<void> {
 
 export function makeSessionCookie(sessionId: string): string {
   const expires = new Date(Date.now() + SESSION_DURATION_MS).toUTCString();
-  return `${SESSION_COOKIE}=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Strict; Expires=${expires}`;
+  return `${SESSION_COOKIE}=${sessionId}; Path=${COOKIE_PATH}; HttpOnly; Secure; SameSite=Strict; Expires=${expires}`;
 }
 
 export function clearSessionCookie(): string {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
+  return `${SESSION_COOKIE}=; Path=${COOKIE_PATH}; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }

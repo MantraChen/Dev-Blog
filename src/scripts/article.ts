@@ -1,4 +1,5 @@
-export {};
+import { discussionTerm } from "@/lib/site-path";
+
 let cleanup = () => {};
 document.addEventListener("astro:before-swap", () => cleanup());
 function initializePage() {
@@ -73,7 +74,7 @@ function initializePage() {
     const script = document.createElement("script");
     script.src = "https://giscus.app/client.js";
     const settings = { repo: "MantraChen/Dev-Blog", "repo-id": "R_kgDORxxsSQ", category: "Announcements",
-      "category-id": "DIC_kwDORxxsSc4C5bq6", mapping: "pathname", strict: "1", "reactions-enabled": "1",
+      "category-id": "DIC_kwDORxxsSc4C5bq6", mapping: "specific", term: discussionTerm(window.location.pathname), strict: "1", "reactions-enabled": "1",
       "emit-metadata": "0", "input-position": "top", theme: getTheme(), lang: "zh-CN", loading: "lazy" };
     Object.entries(settings).forEach(([key, value]) => script.setAttribute(`data-${key}`, value));
     script.crossOrigin = "anonymous";

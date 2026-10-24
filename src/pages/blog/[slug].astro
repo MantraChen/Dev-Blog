@@ -1,4 +1,5 @@
 ---
+import { withBase, contentUrl } from "@/lib/site-path";
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getPostBySlug, getPostViewCount, getAdjacentPosts } from "@/db/queries"
 import { renderMarkdown } from "@/lib/markdown"
@@ -53,7 +54,7 @@ Astro.response.headers.set('Cache-Control', post.hidden ? 'private, no-store' : 
         {post.coverImage && (
           <div class="relative w-full aspect-video rounded-lg overflow-hidden mb-6 border border-border">
             <img
-              src={post.coverImage}
+              src={contentUrl(post.coverImage)}
               alt={post.title}
               loading="eager"
               class="absolute inset-0 w-full h-full object-cover"
@@ -107,12 +108,12 @@ Astro.response.headers.set('Cache-Control', post.hidden ? 'private, no-store' : 
 
       <nav class="mt-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-t border-border pt-6">
         {prev ? (
-          <a href={`/blog/${prev.slug}`} class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <a href={withBase(`/blog/${prev.slug}`)} class="text-sm text-muted-foreground hover:text-foreground transition-colors">
             ← {prev.title}
           </a>
         ) : <span />}
         {next ? (
-          <a href={`/blog/${next.slug}`} class="text-sm text-muted-foreground hover:text-foreground transition-colors text-right">
+          <a href={withBase(`/blog/${next.slug}`)} class="text-sm text-muted-foreground hover:text-foreground transition-colors text-right">
             {next.title} →
           </a>
         ) : <span />}
@@ -191,11 +192,12 @@ Astro.response.headers.set('Cache-Control', post.hidden ? 'private, no-store' : 
 
   <script>import "@/scripts/article";</script>
   <script>
+    import { withBase } from "@/lib/site-path";
     function recordVisibleVisit() {
       const article = document.querySelector<HTMLElement>('[data-post-slug]');
       if (!article || article.dataset.viewRecorded || document.visibilityState !== 'visible') return;
       article.dataset.viewRecorded = 'true';
-      fetch('/api/posts/views', {
+      fetch(withBase('/api/posts/views'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug: article.dataset.postSlug }),
       }).then(async response => {

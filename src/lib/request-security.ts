@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { SESSION_COOKIE } from "./site-path";
 
 // Use the adapter's validated address; never read arbitrary forwarding headers here.
 // Production must bind to loopback behind the proxy described in deploy/setup.md.
@@ -7,7 +8,7 @@ export function getClientIp(clientAddress: string): string {
 }
 
 export function parseSessionCookie(header: string | null): string | null {
-  const match = header?.match(/(?:^|;\s*)admin_session=([^;]*)/);
+  const match = header?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]*)`));
   if (!match) return null;
   try {
     const value = decodeURIComponent(match[1]);

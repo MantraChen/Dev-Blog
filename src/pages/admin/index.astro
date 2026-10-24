@@ -1,4 +1,5 @@
 ---
+import { withBase } from "@/lib/site-path";
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { validateSession } from "@/lib/auth"
 import { AdminApp } from "@/components/admin/AdminApp"
@@ -6,7 +7,7 @@ import { AdminApp } from "@/components/admin/AdminApp"
 const isAuthenticated = await validateSession(Astro.request.headers.get("cookie"))
 
 if (!isAuthenticated) {
-  return Astro.redirect("/admin/login")
+  return Astro.redirect(withBase("/admin/login"))
 }
 ---
 
@@ -25,9 +26,10 @@ if (!isAuthenticated) {
   </div>
 
   <script>
+    import { withBase } from "@/lib/site-path";
     document.getElementById('logout-btn')!.addEventListener('click', async () => {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/admin/login';
+      await fetch(withBase('/api/auth/logout'), { method: 'POST' });
+      window.location.href = withBase('/admin/login');
     });
   </script>
 </BaseLayout>

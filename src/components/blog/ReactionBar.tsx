@@ -1,3 +1,4 @@
+import { withBase } from "@/lib/site-path";
 import { useState, useEffect, useRef } from "react";
 
 const EMOJIS = ["👍", "🎉", "❤️", "🚀", "👀", "🤔"];
@@ -13,7 +14,7 @@ export function ReactionBar({ slug }: { slug: string }) {
     setPending(true);
     setReactions({});
     setError(null);
-    fetch(`/api/reactions?slug=${encodeURIComponent(slug)}`, { signal: controller.signal })
+    fetch(withBase(`/api/reactions?slug=${encodeURIComponent(slug)}`), { signal: controller.signal })
       .then(async response => {
         if (!response.ok) throw new Error("Could not load reactions.");
         const counts = await response.json();
@@ -32,7 +33,7 @@ export function ReactionBar({ slug }: { slug: string }) {
     const controller = new AbortController();
     request.current = controller;
     try {
-      const response = await fetch("/api/reactions", {
+      const response = await fetch(withBase("/api/reactions"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, emoji }), signal: controller.signal,
       });

@@ -4,6 +4,7 @@ import hljs from "highlight.js";
 import markedKatex from "marked-katex-extension";
 import sanitizeHtml from "sanitize-html";
 import { createHash } from "node:crypto";
+import { contentUrl } from "./site-path";
 
 // Generate slug from heading text
 function slugify(text: string): string {
@@ -123,7 +124,9 @@ export function renderMarkdown(content: string): string {
     parser: { lowerCaseTags: false, lowerCaseAttributeNames: false },
     transformTags: {
       input: (_tag, attributes) => ({ tagName: "input", attribs: { ...attributes, type: "checkbox", disabled: "" } }),
-      img: sanitizeHtml.simpleTransform("img", { loading: "lazy", decoding: "async" }),
+      a: (_tag, attributes) => ({ tagName: "a", attribs: { ...attributes, ...(attributes.href ? { href: contentUrl(attributes.href) } : {}) } }),
+      img: (_tag, attributes) => ({ tagName: "img", attribs: { ...attributes,
+        ...(attributes.src ? { src: contentUrl(attributes.src) } : {}), loading: "lazy", decoding: "async" } }),
     },
   });
   const bytes = Buffer.byteLength(sanitized, "utf8");
