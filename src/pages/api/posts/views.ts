@@ -24,7 +24,7 @@ export const POST: APIRoute = async ({ request }) => {
   const parsed = await safeParseBody(request, viewSchema);
   if (!parsed.success) {
     return new Response(JSON.stringify({ error: parsed.error }), {
-      status: 400,
+      status: parsed.status,
       headers: { "Content-Type": "application/json" },
     });
   }

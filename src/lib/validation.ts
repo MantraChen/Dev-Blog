@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const loginSchema = z.object({ password: z.string().min(1).max(1024) });
+
 // ─── Shared Helpers ─────────────────────────────────────────────────
 
 /** Parse a route param as a positive integer, or return null */
@@ -143,13 +145,36 @@ export const viewSchema = z.object({
 
 export async function safeParseBody<T>(
   request: Request,
-  schema: z.ZodSchema<T>,
-): Promise<{ success: true; data: T } | { success: false; error: string }> {
+  schema: z.ZodType<T>,
+): Promise<{ success: true; data: T } | { success: false; error: string; status: number }> {
+  if (request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() !== "application/json") {
+    return { success: false, error: "Content-Type must be application/json", status: 415 };
+  }
+  const maxBytes = 1024 * 1024;
+  if (Number(request.headers.get("content-length")) > maxBytes) {
+    return { success: false, error: "Request body too large", status: 413 };
+  }
   let raw: unknown;
+  const reader = request.body?.getReader();
   try {
-    raw = await request.json();
+    if (!reader) return { success: false, error: "JSON body required", status: 400 };
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > maxBytes) {
+        void reader.cancel().catch(() => {});
+        return { success: false, error: "Request body too large", status: 413 };
+      }
+      chunks.push(chunk.value);
+    }
+    raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
-    return { success: false, error: "Invalid JSON body" };
+    return { success: false, error: "Invalid JSON body", status: 400 };
+  } finally {
+    reader?.releaseLock();
   }
 
   const result = schema.safeParse(raw);
@@ -157,7 +182,7 @@ export async function safeParseBody<T>(
     const message = result.error.issues
       .map((i) => `${i.path.join(".")}: ${i.message}`)
       .join("; ");
-    return { success: false, error: message };
+    return { success: false, error: message, status: 400 };
   }
 
   return { success: true, data: result.data };

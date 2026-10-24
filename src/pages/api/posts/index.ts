@@ -33,7 +33,7 @@ export const POST: APIRoute = async ({ request }) => {
   const parsed = await safeParseBody(request, createPostSchema);
   if (!parsed.success) {
     return new Response(JSON.stringify({ error: parsed.error }), {
-      status: 400,
+      status: parsed.status,
       headers: AUTH_HEADERS,
     });
   }

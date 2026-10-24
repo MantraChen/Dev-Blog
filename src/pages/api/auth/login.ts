@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { login, makeSessionCookie, checkRateLimit, clearRateLimit, getClientIp } from "@/lib/auth";
 import { createAuditLog } from "@/db/queries";
+import { loginSchema, safeParseBody } from "@/lib/validation";
 
 export const POST: APIRoute = async ({ request }) => {
   const ip = getClientIp(request);
@@ -21,17 +22,15 @@ export const POST: APIRoute = async ({ request }) => {
     );
   }
 
-  const body = await request.json();
-  const password = body?.password;
-
-  if (!password || typeof password !== "string") {
-    return new Response(JSON.stringify({ error: "Password required" }), {
-      status: 400,
+  const parsed = await safeParseBody(request, loginSchema);
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: parsed.error }), {
+      status: parsed.status,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  const sessionId = await login(password);
+  const sessionId = await login(parsed.data.password);
 
   if (!sessionId) {
     await createAuditLog({ action: "login.failed", ip });
