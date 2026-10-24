@@ -13,7 +13,8 @@
     "db:migrate": "node scripts/migrate.mjs",
     "check": "astro check",
     "test": "node --import tsx --test tests/*.test.ts tests/*.test.cjs",
-    "verify": "npm run check && npm test && npm run build"
+    "verify": "npm run check && npm test && npm run build && npm run test:http",
+    "test:http": "node tests/http-smoke.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^11.1.9",

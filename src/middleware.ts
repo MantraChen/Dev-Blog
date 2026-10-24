@@ -36,6 +36,8 @@ export const onRequest = defineMiddleware(async ({ request, clientAddress }, nex
   }
 
   response.headers.set("X-Content-Type-Options", "nosniff");
+  // The adapter aborts oversized streams; never reuse that partially consumed connection.
+  if (response.status === 413) response.headers.set("Connection", "close");
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
