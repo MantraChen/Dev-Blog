@@ -1,5 +1,7 @@
 # Linux 试运行与切换
 
+接入 `HaruharaZhang/my_server` 的具体方案见 [服务器仓库适配说明](../my-server/README.md)，该方案通过朋友仓库的审核和组件部署入口运行。
+
 这是 Ubuntu LTS / systemd 的候选部署模板，尚未在本轮 Windows 机器实机运行。保留 Caddy、Node 和 SQLite；不自动替换线上 NSSM 服务。
 
 1. 安装 Node 24.22.1 或同主版本更新补丁、npm、Git、官方 Caddy 和 SQLite 所需系统库。建立无登录权限的 `devblog` 用户。核对模板中 `/usr/bin/node`，不要混用不同 Node 主版本构建原生模块。
