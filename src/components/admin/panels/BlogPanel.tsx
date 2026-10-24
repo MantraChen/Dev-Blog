@@ -60,7 +60,7 @@ export function BlogPanel() {
     setPreview(false);
   };
 
-  const save = async (e: React.FormEvent<HTMLFormElement>) => {
+  const save = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const body = {

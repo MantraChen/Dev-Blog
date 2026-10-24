@@ -71,10 +71,10 @@ export const createProjectSchema = z.object({
 });
 
 export const updateProjectSchema = createProjectSchema.extend({
-  techStack: createProjectSchema.shape.techStack.removeDefault(),
-  demoUrl: createProjectSchema.shape.demoUrl.removeDefault(),
-  repoUrl: createProjectSchema.shape.repoUrl.removeDefault(),
-  sortOrder: createProjectSchema.shape.sortOrder.removeDefault(),
+  techStack: createProjectSchema.shape.techStack.unwrap(),
+  demoUrl: createProjectSchema.shape.demoUrl.unwrap(),
+  repoUrl: createProjectSchema.shape.repoUrl.unwrap(),
+  sortOrder: createProjectSchema.shape.sortOrder.unwrap(),
 }).partial();
 
 // ─── Skills ─────────────────────────────────────────────────────────
@@ -88,9 +88,9 @@ export const createSkillSchema = z.object({
 });
 
 export const updateSkillSchema = createSkillSchema.extend({
-  level: createSkillSchema.shape.level.removeDefault(),
-  iconSlug: createSkillSchema.shape.iconSlug.removeDefault(),
-  sortOrder: createSkillSchema.shape.sortOrder.removeDefault(),
+  level: createSkillSchema.shape.level.unwrap(),
+  iconSlug: createSkillSchema.shape.iconSlug.unwrap(),
+  sortOrder: createSkillSchema.shape.sortOrder.unwrap(),
 }).partial();
 
 // ─── Friends ────────────────────────────────────────────────────────
@@ -104,9 +104,9 @@ export const createFriendSchema = z.object({
 });
 
 export const updateFriendSchema = createFriendSchema.extend({
-  avatar: createFriendSchema.shape.avatar.removeDefault(),
-  description: createFriendSchema.shape.description.removeDefault(),
-  sortOrder: createFriendSchema.shape.sortOrder.removeDefault(),
+  avatar: createFriendSchema.shape.avatar.unwrap(),
+  description: createFriendSchema.shape.description.unwrap(),
+  sortOrder: createFriendSchema.shape.sortOrder.unwrap(),
 }).partial();
 
 // ─── Statuses ───────────────────────────────────────────────────────
@@ -138,9 +138,9 @@ export const createTimelineSchema = z.object({
 });
 
 export const updateTimelineSchema = createTimelineSchema.extend({
-  tags: createTimelineSchema.shape.tags.removeDefault(),
-  url: createTimelineSchema.shape.url.removeDefault(),
-  sortOrder: createTimelineSchema.shape.sortOrder.removeDefault(),
+  tags: createTimelineSchema.shape.tags.unwrap(),
+  url: createTimelineSchema.shape.url.unwrap(),
+  sortOrder: createTimelineSchema.shape.sortOrder.unwrap(),
 }).partial();
 
 // ─── Reactions ──────────────────────────────────────────────────────

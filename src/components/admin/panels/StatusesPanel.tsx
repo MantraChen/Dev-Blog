@@ -17,7 +17,7 @@ export function StatusesPanel() {
 
   useEffect(() => { load(); }, [load]);
 
-  const add = async (e: React.FormEvent) => {
+  const add = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!text.trim()) return;
     try {
