@@ -2,13 +2,26 @@ import React, { useState, useEffect, useCallback } from "react";
 
 export function StatsPanel() {
   const [stats, setStats] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/stats");
-    if (res.ok) setStats(await res.json());
+    setError(null);
+    try {
+      const res = await fetch("/api/stats");
+      if (!res.ok) throw new Error(res.status === 401 ? "Your session has expired. Please sign in again." : "Could not load statistics.");
+      setStats(await res.json());
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not load statistics.");
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  if (error) return <div role="alert" className="space-y-3 text-sm">
+    <p>{error}</p>
+    <button onClick={load} className="rounded border px-3 py-2">Retry</button>
+    <a href="/admin/login" className="ml-3 underline">Sign in</a>
+  </div>;
 
   if (!stats) return (
     <div className="space-y-6">
