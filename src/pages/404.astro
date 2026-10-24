@@ -1,8 +1,10 @@
 ---
 import BaseLayout from "@/components/layout/BaseLayout.astro"
+Astro.response.status = 404
+Astro.response.headers.set("Cache-Control", "no-store")
 ---
 
-<BaseLayout title="404 | Lost in Space">
+<BaseLayout title="404 | Lost in Space" noIndex>
   <div id="bhPage" class="bh-page">
     <canvas id="space"></canvas>
 
@@ -24,7 +26,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
     <div id="msgBox" class="msg-box">
       <p class="msg-main" id="mainMsg">This page crossed the event horizon</p>
       <p class="msg-sub">Move your cursor around... carefully.</p>
-      <button id="homeBtn" class="home-btn">Take me home</button>
+      <a id="homeBtn" class="home-btn" href="/">Take me home</a>
     </div>
 
     <div id="spaghetti" class="spaghetti-overlay"></div>
@@ -40,7 +42,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      cursor: none;
+      cursor: auto;
       user-select: none;
       background: hsl(var(--background));
       transition: background 0.5s ease;
@@ -152,16 +154,25 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       opacity: 1;
       pointer-events: all;
     }
+    @media (prefers-reduced-motion: reduce) {
+      #space, #debris-zone, .msg-sub { display: none; }
+    }
   </style>
 
   <script>
+    let cleanup = () => {};
+    document.addEventListener("astro:before-swap", () => cleanup());
+    function initSpace() {
+    cleanup();
+    if (!document.getElementById("bhPage") || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    let frame = 0;
     const canvas = document.getElementById('space') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d')!;
     const chunks = document.querySelectorAll('.chunk') as NodeListOf<HTMLElement>;
-    const btn = document.getElementById('homeBtn') as HTMLButtonElement;
     const msgBox = document.getElementById('msgBox')!;
     const mainMsg = document.getElementById('mainMsg')!;
-    const spaghetti = document.getElementById('spaghetti')!;
 
     let W = 0, H = 0;
     let mx = 0, my = 0;
@@ -180,18 +191,6 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       targetBgColor = isDark ? '#09090b' : '#ffffff';
     });
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-
-    // Lerp hex colors for smooth canvas transition
-    function lerpColor(a: string, b: string, t: number): string {
-      const ah = parseInt(a.slice(1), 16);
-      const bh = parseInt(b.slice(1), 16);
-      const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
-      const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
-      const rr = Math.round(ar + (br - ar) * t);
-      const rg = Math.round(ag + (bg - ag) * t);
-      const rb = Math.round(ab + (bb - ab) * t);
-      return `rgb(${rr},${rg},${rb})`;
-    }
 
     // === STARS (full screen, lots of them) ===
     const NUM_STARS = 600;
@@ -228,7 +227,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
       }
     }
     resize();
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', resize, { signal });
     for (let i = 0; i < NUM_STARS; i++) spawnStar(i);
 
     function getStarColors(): [number, number, number][] {
@@ -380,11 +379,11 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
     document.addEventListener('mousemove', (e) => {
       if (eaten) return;
       mx = e.clientX; my = e.clientY;
-    });
+    }, { signal });
     document.addEventListener('touchmove', (e) => {
       if (eaten) return;
       mx = e.touches[0].clientX; my = e.touches[0].clientY;
-    });
+    }, { passive: true, signal });
 
     // === MESSAGES ===
     const messages = [
@@ -399,6 +398,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
 
     // === MAIN LOOP ===
     function tick(now: number) {
+      if (signal.aborted || !canvas.isConnected) return;
       // Smooth background color transition
       if (bgColor !== targetBgColor) {
         bgColor = targetBgColor;
@@ -411,7 +411,7 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
         bhRadius = Math.min(bhRadius + 2, Math.max(W, H));
         drawStars();
         drawBlackHole();
-        requestAnimationFrame(tick);
+        frame = requestAnimationFrame(tick);
         return;
       }
 
@@ -486,41 +486,14 @@ import BaseLayout from "@/components/layout/BaseLayout.astro"
         msgBox.style.opacity = '1';
       }
 
-      // dodge button
-      const btnRect = btn.getBoundingClientRect();
-      const btnCx = btnRect.left + btnRect.width / 2;
-      const btnCy = btnRect.top + btnRect.height / 2;
-      const btnDist = Math.sqrt((bhX - btnCx) ** 2 + (bhY - btnCy) ** 2);
-
-      if (dodgeCount < 5 && btnDist < 120) {
-        dodgeCount++;
-        btn.classList.add('dodge');
-        const angle = Math.atan2(btnCy - bhY, btnCx - bhX);
-        btn.style.transform = `translate(${Math.cos(angle) * 160}px, ${Math.sin(angle) * 160}px)`;
-        const taunts = ["Nope!", "Too slow!", "Catch me!", "Nice try!", "Lol no"];
-        mainMsg.textContent = taunts[dodgeCount - 1] || "404";
-        lastMsgSwap = now;
-      }
-
-      if (dodgeCount >= 5 && !btn.classList.contains('surrender')) {
-        btn.classList.remove('dodge');
-        btn.classList.add('surrender');
-        btn.style.transform = '';
-        btn.textContent = "OK fine, go home";
-      }
-
-      requestAnimationFrame(tick);
+      frame = requestAnimationFrame(tick);
     }
-    requestAnimationFrame(tick);
+    frame = requestAnimationFrame(tick);
 
-    // === BUTTON CLICK ===
-    btn.addEventListener('click', () => {
-      if (dodgeCount < 5) return;
-      eaten = true;
-      spaghetti.classList.add('active');
-      msgBox.classList.add('warped');
-      chunks.forEach(c => c.classList.add('dying'));
-      setTimeout(() => { window.location.href = '/'; }, 2000);
-    });
+    cleanup = () => { controller.abort(); themeObserver.disconnect(); cancelAnimationFrame(frame); };
+    }
+    initSpace();
+    window.addEventListener("pageshow", event => { if (event.persisted) initSpace(); });
+    window.addEventListener("pagehide", () => cleanup());
   </script>
 </BaseLayout>

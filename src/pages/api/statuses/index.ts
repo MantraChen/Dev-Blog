@@ -14,7 +14,7 @@ export const GET: APIRoute = async ({ url }) => {
   });
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, clientAddress }) => {
   if (!(await validateSession(request.headers.get("cookie")))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
@@ -25,7 +25,7 @@ export const POST: APIRoute = async ({ request }) => {
   const parsed = await safeParseBody(request, createStatusSchema);
   if (!parsed.success) {
     return new Response(JSON.stringify({ error: parsed.error }), {
-      status: 400,
+      status: parsed.status,
       headers: { "Content-Type": "application/json" },
     });
   }
@@ -36,7 +36,7 @@ export const POST: APIRoute = async ({ request }) => {
     action: "status.create",
     resource: "status",
     resourceId: String(result[0].id),
-    ip: getClientIp(request),
+    ip: getClientIp(clientAddress),
   });
 
   return new Response(JSON.stringify(result[0]), {

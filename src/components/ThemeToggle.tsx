@@ -14,7 +14,7 @@ export function ThemeToggle() {
     setTheme(nextTheme);
     document.documentElement.classList.add("theme-transition");
     document.documentElement.classList.toggle("dark", nextTheme === "dark");
-    localStorage.setItem("theme", nextTheme);
+    try { localStorage.setItem("theme", nextTheme); } catch { /* Storage may be disabled. */ }
     setTimeout(() => {
       document.documentElement.classList.remove("theme-transition");
     }, 350);

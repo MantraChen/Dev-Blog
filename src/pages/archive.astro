@@ -1,8 +1,8 @@
 ---
 import BaseLayout from "@/components/layout/BaseLayout.astro"
-import { getPublishedPosts } from "@/db/queries"
+import { getPublishedPostMetadata } from "@/db/queries"
 
-const posts = await getPublishedPosts()
+const posts = await getPublishedPostMetadata()
 
 // 按年月分组
 const grouped: Record<string, Record<string, typeof posts>> = {}

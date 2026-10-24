@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "@/components/layout/BaseLayout.astro"
-import { getPostBySlug, getPostViewCount, recordPostView, getAdjacentPosts } from "@/db/queries"
-import { marked } from "@/lib/markdown"
+import { getPostBySlug, getPostViewCount, getAdjacentPosts } from "@/db/queries"
+import { renderMarkdown } from "@/lib/markdown"
 import { estimateReadingTime } from "@/lib/utils"
 import { ReactionBar } from "@/components/blog/ReactionBar"
 
@@ -10,11 +10,10 @@ const { slug } = Astro.params
 const post = await getPostBySlug(slug!)
 
 if (!post || post.draft) {
-  return Astro.redirect("/404")
+  return Astro.rewrite("/404")
 }
 
 // 记录浏览量并获取计数和前后文章
-await recordPostView(slug!)
 const viewCount = await getPostViewCount(slug!)
 const { prev, next } = await getAdjacentPosts(slug!)
 
@@ -22,7 +21,7 @@ const { prev, next } = await getAdjacentPosts(slug!)
 const readingTime = estimateReadingTime(post.content)
 
 // Render markdown to HTML
-const htmlContent = await marked.parse(post.content)
+const htmlContent = renderMarkdown(post.content)
 
 // Extract headings for TOC
 const headingRegex = /<h([1-3])\s+id="([^"]*)"[^>]*>(.*?)<\/h\1>/gi
@@ -41,14 +40,14 @@ const description = post.description || post.content.replace(/[#*`>\-\[\]()!{}\n
 
 const publishedDate = new Date(post.publishedAt)
 
-Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=3600')
+Astro.response.headers.set('Cache-Control', post.hidden ? 'private, no-store' : 'no-cache')
 ---
 
-<BaseLayout title={`${post.title} | Blog`} description={description}>
+<BaseLayout title={`${post.title} | Blog`} description={description} ogImage={post.coverImage || undefined} noIndex={post.hidden} article={{ publishedAt: post.publishedAt, updatedAt: post.updatedAt }}>
   <div id="reading-progress"></div>
 
   <div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 flex gap-10">
-    <article class="flex-1 min-w-0">
+    <article class="flex-1 min-w-0" data-post-slug={slug}>
 
       <header class="mb-10 reveal">
         {post.coverImage && (
@@ -69,7 +68,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
                 <span>·</span>
                 <span>{readingTime} min read</span>
                 <span>·</span>
-                <span>{viewCount} 次阅读</span>
+                <span><span data-post-views>{viewCount}</span> views</span>
               </div>
               <div class="flex flex-wrap gap-2 mt-3">
                 {post.tags.map((tag) => (
@@ -82,14 +81,14 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         {!post.coverImage && (
           <>
             <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight lg:text-5xl mb-4">{post.title}</h1>
-            <div class="flex items-center gap-4 text-muted-foreground">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-muted-foreground">
               <time>
                 {publishedDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
               </time>
               <span>·</span>
               <span>{readingTime} min read</span>
               <span>·</span>
-              <span>{viewCount} 次阅读</span>
+              <span><span data-post-views>{viewCount}</span> views</span>
             </div>
             <div class="flex flex-wrap gap-2 mt-4">
               {post.tags.map((tag) => (
@@ -100,7 +99,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         )}
       </header>
 
-      <div class="prose prose-zinc dark:prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:rounded-lg prose-lead:leading-relaxed reveal">
+      <div class="prose prose-zinc dark:prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:rounded-lg prose-lead:leading-relaxed">
         <Fragment set:html={htmlContent} />
       </div>
 
@@ -120,50 +119,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
       </nav>
 
       <section class="mt-12 w-full" id="giscus-container"></section>
-      <script is:inline>
-        (function() {
-          function getTheme() {
-            return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-          }
 
-          function loadGiscus() {
-            var container = document.getElementById('giscus-container');
-            if (!container) return;
-            container.innerHTML = '';
-            var script = document.createElement('script');
-            script.src = 'https://giscus.app/client.js';
-            script.setAttribute('data-repo', 'MantraChen/Dev-Blog');
-            script.setAttribute('data-repo-id', 'R_kgDORxxsSQ');
-            script.setAttribute('data-category', 'Announcements');
-            script.setAttribute('data-category-id', 'DIC_kwDORxxsSc4C5bq6');
-            script.setAttribute('data-mapping', 'pathname');
-            script.setAttribute('data-strict', '1');
-            script.setAttribute('data-reactions-enabled', '1');
-            script.setAttribute('data-emit-metadata', '0');
-            script.setAttribute('data-input-position', 'top');
-            script.setAttribute('data-theme', getTheme());
-            script.setAttribute('data-lang', 'zh-CN');
-            script.setAttribute('data-loading', 'lazy');
-            script.setAttribute('crossorigin', 'anonymous');
-            script.async = true;
-            container.appendChild(script);
-          }
-
-          loadGiscus();
-
-          // Watch for theme changes and reload Giscus
-          var observer = new MutationObserver(function() {
-            var frame = document.querySelector('iframe.giscus-frame');
-            if (frame && frame.contentWindow) {
-              frame.contentWindow.postMessage(
-                { giscus: { setConfig: { theme: getTheme() } } },
-                'https://giscus.app'
-              );
-            }
-          });
-          observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-        })();
-      </script>
     </article>
 
     {tocHeadings.length > 0 && (
@@ -194,6 +150,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         id="mobile-toc-btn"
         class="lg:hidden fixed bottom-20 right-6 z-40 h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors"
         aria-label="Table of Contents"
+        aria-controls="toc-drawer" aria-expanded="false" aria-haspopup="dialog"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="8" x2="21" y1="6" y2="6"/>
@@ -205,11 +162,10 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
         </svg>
       </button>
 
-      <div id="toc-overlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden opacity-0 transition-opacity duration-300 lg:hidden"></div>
 
-      <div id="toc-drawer" class="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border rounded-t-xl max-h-[60vh] flex flex-col translate-y-full transition-transform duration-300 ease-out lg:hidden">
+      <dialog id="toc-drawer" aria-labelledby="toc-title" class="fixed top-auto bottom-0 left-0 right-0 m-0 w-full max-w-none z-50 bg-background text-foreground border-t border-border rounded-t-xl max-h-[60vh] open:flex flex-col lg:hidden">
         <div class="flex items-center justify-between p-4 border-b border-border shrink-0">
-          <span class="font-semibold text-foreground">On this page</span>
+          <span id="toc-title" class="font-semibold text-foreground">On this page</span>
           <button id="toc-close-btn" class="text-muted-foreground hover:text-foreground p-2.5 rounded-md hover:bg-muted transition-colors" aria-label="Close">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -229,114 +185,26 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
             ))}
           </ul>
         </div>
-      </div>
+      </dialog>
     </>
   )}
 
-  <script is:inline>
-    function initBlogEnhancements() {
-      // Reading progress bar
-      const bar = document.getElementById('reading-progress');
-      if (bar) {
-        const updateProgress = () => {
-          const scrollTop = window.scrollY;
-          const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-          bar.style.width = docHeight > 0 ? (scrollTop / docHeight * 100) + '%' : '0%';
-        };
-        window.addEventListener('scroll', updateProgress, { passive: true });
-        updateProgress();
-      }
-
-      // Code copy buttons
-      document.querySelectorAll('.prose pre').forEach(pre => {
-        if (pre.querySelector('.copy-btn')) return;
-        const btn = document.createElement('button');
-        btn.className = 'copy-btn';
-        btn.textContent = 'Copy';
-        btn.setAttribute('aria-label', 'Copy code');
-        btn.addEventListener('click', async () => {
-          const code = pre.querySelector('code')?.textContent || '';
-          await navigator.clipboard.writeText(code);
-          btn.textContent = 'Copied!';
-          setTimeout(() => btn.textContent = 'Copy', 1500);
-        });
-        pre.appendChild(btn);
-      });
-
-      // TOC active heading highlight (Desktop)
-      const tocLinks = document.querySelectorAll('.toc-link');
-      if (tocLinks.length > 0) {
-        const headingEls = Array.from(tocLinks).map(l =>
-          document.getElementById(l.dataset.slug)
-        ).filter(Boolean);
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              tocLinks.forEach(l => l.classList.remove('text-foreground', 'font-medium'));
-              const active = document.querySelector(`.toc-link[data-slug="${entry.target.id}"]`);
-              if (active) active.classList.add('text-foreground', 'font-medium');
-            }
-          });
-        }, { rootMargin: '-80px 0px -60% 0px' });
-        headingEls.forEach(el => observer.observe(el));
-      }
+  <script>import "@/scripts/article";</script>
+  <script>
+    function recordVisibleVisit() {
+      const article = document.querySelector<HTMLElement>('[data-post-slug]');
+      if (!article || article.dataset.viewRecorded || document.visibilityState !== 'visible') return;
+      article.dataset.viewRecorded = 'true';
+      fetch('/api/posts/views', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: article.dataset.postSlug }),
+      }).then(async response => {
+        if (!response.ok) return;
+        const { views } = await response.json();
+        article.querySelectorAll('[data-post-views]').forEach(element => { element.textContent = String(views); });
+      }).catch(() => { /* Reading remains available when analytics are offline. */ });
     }
-
-    // Mobile TOC Logic
-    function initMobileTOC() {
-      const btn = document.getElementById('mobile-toc-btn');
-      const overlay = document.getElementById('toc-overlay');
-      const drawer = document.getElementById('toc-drawer');
-      const closeBtn = document.getElementById('toc-close-btn');
-      const mobileLinks = document.querySelectorAll('.mobile-toc-link');
-
-      if (!btn || !overlay || !drawer) return;
-
-      const openDrawer = () => {
-        overlay.classList.remove('hidden');
-        // Force reflow
-        void overlay.offsetWidth;
-        overlay.classList.remove('opacity-0');
-        drawer.classList.remove('translate-y-full');
-        document.body.style.overflow = 'hidden';
-      };
-
-      const closeDrawer = () => {
-        drawer.classList.add('translate-y-full');
-        overlay.classList.add('opacity-0');
-        document.body.style.overflow = '';
-        setTimeout(() => {
-          overlay.classList.add('hidden');
-        }, 300);
-      };
-
-      btn.addEventListener('click', openDrawer);
-      overlay.addEventListener('click', closeDrawer);
-      if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
-
-      mobileLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-          e.preventDefault();
-          closeDrawer();
-
-          const targetId = link.getAttribute('href').substring(1);
-          const targetEl = document.getElementById(targetId);
-          if (targetEl) {
-            setTimeout(() => {
-              targetEl.scrollIntoView({ behavior: 'smooth' });
-              history.pushState(null, null, `#${targetId}`);
-            }, 100);
-          }
-        });
-      });
-    }
-
-    initBlogEnhancements();
-    initMobileTOC();
-
-    document.addEventListener('astro:after-swap', () => {
-      initBlogEnhancements();
-      initMobileTOC();
-    });
+    recordVisibleVisit();
+    document.addEventListener('visibilitychange', recordVisibleVisit);
   </script>
 </BaseLayout>

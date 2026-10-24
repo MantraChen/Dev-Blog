@@ -6,8 +6,7 @@ import { estimateReadingTime } from "@/lib/utils"
 const statuses = await getLatestStatuses(1)
 const projects = await getProjectList()
 const skills = await getSkillList()
-const allPosts = await getPublishedPosts()
-const recentPosts = allPosts.slice(0, 3)
+const recentPosts = await getPublishedPosts(3)
 
 const topProjects = projects.slice(0, 3)
 const topSkills = skills.slice(0, 12)

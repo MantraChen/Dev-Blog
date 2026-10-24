@@ -1,10 +1,10 @@
 import type { APIRoute } from "astro";
-import { getPublishedPosts, getProjectList } from "@/db/queries";
+import { getPublishedPostMetadata } from "@/db/queries";
+import { escapeXml, feedDate } from "@/lib/feed-format";
 
 export const GET: APIRoute = async ({ site }) => {
   const baseUrl = site?.toString().replace(/\/$/, "") || "https://example.com";
-  const posts = await getPublishedPosts();
-  const projects = await getProjectList();
+  const posts = await getPublishedPostMetadata();
 
   const staticPages = [
     { url: "/", priority: "1.0" },
@@ -19,12 +19,12 @@ export const GET: APIRoute = async ({ site }) => {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${staticPages.map((p) => `  <url>
-    <loc>${baseUrl}${p.url}</loc>
+    <loc>${escapeXml(baseUrl + p.url)}</loc>
     <priority>${p.priority}</priority>
   </url>`).join("\n")}
 ${posts.map((post) => `  <url>
-    <loc>${baseUrl}/blog/${post.slug}</loc>
-    <lastmod>${post.updatedAt || post.publishedAt}</lastmod>
+    <loc>${escapeXml(baseUrl + "/blog/" + encodeURIComponent(post.slug))}</loc>
+    ${feedDate(post.updatedAt || post.publishedAt) ? `<lastmod>${feedDate(post.updatedAt || post.publishedAt)}</lastmod>` : ""}
     <priority>0.8</priority>
   </url>`).join("\n")}
 </urlset>`;
@@ -32,7 +32,7 @@ ${posts.map((post) => `  <url>
   return new Response(xml, {
     headers: {
       "Content-Type": "application/xml",
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": "no-cache",
     },
   });
 };

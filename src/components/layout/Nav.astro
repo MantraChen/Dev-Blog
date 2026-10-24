@@ -47,6 +47,7 @@ const isActive = (href: string) => {
         id="mobile-menu-btn"
         class="md:hidden flex items-center justify-center p-2 text-foreground/60 hover:text-foreground focus:outline-none transition-colors"
         aria-label="Toggle Menu"
+        aria-controls="mobile-menu-panel" aria-expanded="false"
       >
         <svg id="menu-icon-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="block">
           <line x1="4" x2="20" y1="12" y2="12" />
@@ -63,6 +64,7 @@ const isActive = (href: string) => {
 
   <div
     id="mobile-menu-panel"
+    inert
     class="absolute left-0 top-14 w-full bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 border-b overflow-hidden transition-all duration-300 ease-in-out md:hidden max-h-0 opacity-0 shadow-sm"
   >
     <nav class="flex flex-col px-4 py-3 space-y-2">
@@ -83,6 +85,8 @@ const isActive = (href: string) => {
 </header>
 
 <script>
+  let menuController: AbortController | undefined;
+  document.addEventListener("astro:before-swap", () => menuController?.abort());
   function setupMobileMenu() {
     const btn = document.getElementById('mobile-menu-btn');
     const panel = document.getElementById('mobile-menu-panel');
@@ -94,8 +98,12 @@ const isActive = (href: string) => {
     // 防止重复绑定
     if (btn.dataset.bound) return;
     btn.dataset.bound = 'true';
+    menuController?.abort();
+    menuController = new AbortController();
+    const signal = menuController.signal;
 
     const openMenu = () => {
+      panel.inert = false;
       panel.classList.remove('max-h-0', 'opacity-0');
       panel.classList.add('max-h-[500px]', 'opacity-100');
       iconOpen.classList.add('hidden');
@@ -104,6 +112,7 @@ const isActive = (href: string) => {
     };
 
     const closeMenu = () => {
+      panel.inert = true;
       panel.classList.remove('max-h-[500px]', 'opacity-100');
       panel.classList.add('max-h-0', 'opacity-0');
       iconOpen.classList.remove('hidden');
@@ -127,10 +136,11 @@ const isActive = (href: string) => {
 
     // 点击页面其他区域关闭菜单
     document.addEventListener('click', (e) => {
-      if (isMenuOpen() && !btn.contains(e.target) && !panel.contains(e.target)) {
+      if (isMenuOpen() && e.target instanceof Node && !btn.contains(e.target) && !panel.contains(e.target)) {
         closeMenu();
       }
-    });
+    }, { signal });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && isMenuOpen()) { closeMenu(); btn.focus(); } }, { signal });
   }
 
   setupMobileMenu();

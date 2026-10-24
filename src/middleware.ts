@@ -1,130 +1,61 @@
 import { defineMiddleware } from "astro:middleware";
+import { RateLimiter } from "./lib/rate-limit";
+import { sqlite } from "./db";
+import { getClientIp, isSameOriginMutation } from "./lib/request-security";
 
-// ─── Rate Limiting for Public Endpoints ─────────────────────────────
-const PUBLIC_RATE_LIMIT = 60; // requests per window
-const PUBLIC_RATE_WINDOW_MS = 60 * 1000; // 1 minute
+const publicLimits = new RateLimiter(sqlite, "public", 60, 60_000);
+const limitedPaths = new Set(["/api/posts/search", "/api/posts/views", "/api/reactions"]);
+const jsonError = (error: string, status: number, headers = {}) =>
+  new Response(JSON.stringify({ error }), { status, headers: { "Content-Type": "application/json", ...headers } });
 
-const publicRateLimits = new Map<
-  string,
-  { count: number; windowStart: number }
->();
-
-// Clean up stale entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of publicRateLimits) {
-    if (now - value.windowStart > PUBLIC_RATE_WINDOW_MS * 2) {
-      publicRateLimits.delete(key);
-    }
-  }
-}, 5 * 60 * 1000);
-
-const IP_PATTERN = /^[\d.:a-fA-F]{1,45}$/;
-
-function getIp(request: Request): string {
-  const raw =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
-  return IP_PATTERN.test(raw) ? raw : "unknown";
-}
-
-function checkPublicRateLimit(ip: string): {
-  allowed: boolean;
-  remaining: number;
-} {
-  const now = Date.now();
-  const record = publicRateLimits.get(ip);
-
-  if (!record || now - record.windowStart > PUBLIC_RATE_WINDOW_MS) {
-    publicRateLimits.set(ip, { count: 1, windowStart: now });
-    return { allowed: true, remaining: PUBLIC_RATE_LIMIT - 1 };
-  }
-
-  if (record.count >= PUBLIC_RATE_LIMIT) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  record.count++;
-  return { allowed: true, remaining: PUBLIC_RATE_LIMIT - record.count };
-}
-
-// Public API paths that need rate limiting
-const RATE_LIMITED_PATHS = [
-  "/api/posts/search",
-  "/api/posts/views",
-  "/api/reactions",
-];
-
-// Max request body size: 1MB
-const MAX_BODY_SIZE = 1 * 1024 * 1024;
-
-export const onRequest = defineMiddleware(async ({ request }, next) => {
+export const onRequest = defineMiddleware(async ({ request, clientAddress }, next) => {
   const url = new URL(request.url);
-  const path = url.pathname;
-
-  // ─── Request Body Size Check ────────────────────────────────────
-  const contentLength = request.headers.get("content-length");
-  if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
-    return new Response(JSON.stringify({ error: "Request body too large" }), {
-      status: 413,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  // ─── Rate Limiting for Public API Endpoints ─────────────────────
-  if (RATE_LIMITED_PATHS.some((p) => path.startsWith(p))) {
-    const ip = getIp(request);
-    const result = checkPublicRateLimit(ip);
-
-    if (!result.allowed) {
-      return new Response(JSON.stringify({ error: "Too many requests" }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": "60",
-        },
-      });
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  let response: Response;
+  if (Number(request.headers.get("content-length")) > 1024 * 1024) {
+    response = jsonError("Request body too large", 413);
+  } else if (path.startsWith("/api/") && !isSameOriginMutation(request)) {
+    response = jsonError("Cross-origin requests are not allowed", 403);
+  } else {
+    const rate = (limitedPaths.has(path) || (path === "/blog" && url.searchParams.has("q"))) ? publicLimits.check(getClientIp(clientAddress)) : null;
+    if (rate && !rate.allowed) {
+      response = jsonError("Too many requests", 429, { "Retry-After": String(rate.retryAfterSeconds) });
+    } else {
+      try {
+        response = await next();
+      } catch (error) {
+        // Do not disclose SQL, content, credentials or stack traces in API responses.
+        const failure = error as { code?: string; cause?: { code?: string } };
+        const code = failure?.code ?? failure?.cause?.code;
+        if (code === "SEARCH_BUSY") {
+          response = jsonError("Search is busy. Please retry shortly.", 503, { "Retry-After": "3" });
+        } else {
+          if (!path.startsWith("/api/")) throw error;
+          console.error("API request failed", path, code ?? "unknown");
+          response = code === "SQLITE_CONSTRAINT_UNIQUE"
+            ? jsonError("This value already exists. Choose a different slug.", 409)
+            : jsonError("Request failed. Please try again.", 500);
+        }
+      }
     }
   }
 
-  const response = await next();
-
-  // ─── Security Headers ──────────────────────────────────────────
   response.headers.set("X-Content-Type-Options", "nosniff");
+  // The adapter aborts oversized streams; never reuse that partially consumed connection.
+  if (response.status === 413) response.headers.set("Connection", "close");
   response.headers.set("X-Frame-Options", "DENY");
-  response.headers.set("X-XSS-Protection", "1; mode=block");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=()",
-  );
-  response.headers.set(
-    "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://giscus.app",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
-      "img-src 'self' data: https:",
-      "font-src 'self' data: https://fonts.gstatic.com",
-      "connect-src 'self'",
-      "frame-src https://giscus.app",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join("; "),
-  );
-
-  // Only set HSTS if the request came over HTTPS (or via proxy)
-  if (
-    request.headers.get("x-forwarded-proto") === "https" ||
-    url.protocol === "https:"
-  ) {
-    response.headers.set(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains",
-    );
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  // Astro hashes trusted template/bundled scripts. Do not hash arbitrary response
+  // HTML or override its policy. frame-ancestors must be an HTTP header.
+  const csp = response.headers.get("Content-Security-Policy");
+  response.headers.set("Content-Security-Policy", [csp, "frame-ancestors 'none'"].filter(Boolean).join("; "));
+  if (path.startsWith("/admin") || path.startsWith("/api/") || response.status >= 400) {
+    response.headers.set("Cache-Control", "private, no-store");
   }
-
+  if (path.startsWith("/admin")) response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  if (url.protocol === "https:") {
+    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   return response;
 });

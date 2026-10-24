@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-}
+import { slugifyPostTitle } from "@/lib/post-slug";
 
 export function BlogPanel() {
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +13,7 @@ export function BlogPanel() {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [autoSlug, setAutoSlug] = useState(true);
+  const [fallbackSlug, setFallbackSlug] = useState("");
   const [coverImage, setCoverImage] = useState("");
 
   const load = useCallback(async () => {
@@ -40,9 +33,9 @@ export function BlogPanel() {
   // Auto-generate slug from title
   useEffect(() => {
     if (autoSlug && !editing) {
-      setSlug(slugify(title));
+      setSlug(title ? slugifyPostTitle(title, fallbackSlug) : "");
     }
-  }, [title, autoSlug, editing]);
+  }, [title, autoSlug, editing, fallbackSlug]);
 
   const startEdit = (post: any) => {
     setEditing(post);
@@ -56,6 +49,7 @@ export function BlogPanel() {
   };
 
   const startNew = () => {
+    setFallbackSlug(`post-${crypto.randomUUID()}`);
     setEditing(null);
     setTitle("");
     setSlug("");
@@ -66,7 +60,7 @@ export function BlogPanel() {
     setPreview(false);
   };
 
-  const save = async (e: React.FormEvent<HTMLFormElement>) => {
+  const save = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const body = {
@@ -88,7 +82,7 @@ export function BlogPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to save post");
       toast.success(editing ? "Post updated successfully" : "Post created successfully");
       setEditing(null);
       setShowForm(false);
@@ -97,8 +91,8 @@ export function BlogPanel() {
       setSlug("");
       setCoverImage("");
       load();
-    } catch {
-      toast.error(editing ? "Failed to update post" : "Failed to create post");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save post");
     }
   };
 
@@ -142,28 +136,24 @@ export function BlogPanel() {
     }
   };
 
-  // 通过服务端 API 进行精准 Markdown 解析
-  const renderPreview = useCallback(async () => {
-    try {
-      const res = await fetch("/api/posts/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-      if (!res.ok) throw new Error("Preview failed");
-      const { html } = await res.json();
-      setPreviewHtml(html);
-    } catch {
-      setPreviewHtml('<p class="text-destructive">Preview rendering failed</p>');
-    }
-  }, [content]);
-
-  // 使用 300ms 的防抖 (debounce) 来避免按键时频繁触发请求
   useEffect(() => {
     if (!preview) return;
-    const timer = setTimeout(() => renderPreview(), 300);
-    return () => clearTimeout(timer);
-  }, [preview, content, renderPreview]);
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/posts/preview", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content }), signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("Preview failed");
+        const { html } = await res.json();
+        if (!controller.signal.aborted) setPreviewHtml(html);
+      } catch {
+        if (!controller.signal.aborted) setPreviewHtml('<p class="text-destructive">Preview rendering failed</p>');
+      }
+    }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [preview, content]);
 
   return (
     <div>

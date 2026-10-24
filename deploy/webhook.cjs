@@ -1,131 +1,100 @@
-/**
- * GitHub Webhook Listener for auto-deploy
- * Runs as a separate NSSM service on Windows Server
- *
- * Environment variables:
- *   WEBHOOK_SECRET  - GitHub webhook secret (required)
- *   WEBHOOK_PORT    - Port to listen on (default: 9000)
- *   DEPLOY_DIR      - Path to the blog repo (default: script's parent dir)
- *   SERVICE_NAME    - NSSM service name (default: dev-blog)
- *   DEPLOY_BRANCH   - Branch to deploy (default: main)
- */
-
+/** GitHub deployment listener; run behind Caddy on loopback. */
 const http = require("node:http");
 const crypto = require("node:crypto");
-const { execSync, exec } = require("node:child_process");
+const { execFile } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs");
 
-const SECRET = process.env.WEBHOOK_SECRET;
-const PORT = parseInt(process.env.WEBHOOK_PORT || "9000", 10);
-const DEPLOY_DIR = process.env.DEPLOY_DIR || path.resolve(__dirname, "..");
-const SERVICE_NAME = process.env.SERVICE_NAME || "dev-blog";
-const BRANCH = process.env.DEPLOY_BRANCH || "main";
-const LOG_FILE = path.join(__dirname, "deploy.log");
-
-if (!SECRET) {
-  console.error("WEBHOOK_SECRET environment variable is required");
-  process.exit(1);
+function verifySignature(payload, signature, secret) {
+  if (typeof signature !== "string" || !/^sha256=[a-f0-9]{64}$/.test(signature)) return false;
+  const expected = crypto.createHmac("sha256", secret).update(payload).digest();
+  return crypto.timingSafeEqual(expected, Buffer.from(signature.slice(7), "hex"));
 }
 
-let deploying = false;
-
-function log(msg) {
-  const line = `[${new Date().toISOString()}] ${msg}`;
-  console.log(line);
-  fs.appendFileSync(LOG_FILE, line + "\n");
-}
-
-function verifySignature(payload, signature) {
-  if (!signature) return false;
-  const hmac = crypto.createHmac("sha256", SECRET);
-  hmac.update(payload);
-  const expected = "sha256=" + hmac.digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-}
-
-function deploy() {
-  if (deploying) {
-    log("Deploy already in progress, skipping");
-    return;
-  }
-  deploying = true;
-  log("=== Deploy started ===");
-
-  // Run deploy in background so webhook can respond immediately
-  const script = path.join(__dirname, "deploy.ps1");
-  exec(`powershell -ExecutionPolicy Bypass -File "${script}"`, { cwd: DEPLOY_DIR, windowsHide: true, encoding: "utf8" }, (err, stdout, stderr) => {
-    deploying = false;
-    if (err) {
-      log(`Deploy FAILED: ${err.message}`);
-      if (stderr) log(`stderr: ${stderr}`);
-    } else {
-      log("Deploy completed successfully");
-    }
-    if (stdout) log(`stdout: ${stdout}`);
-  });
-}
-
-const server = http.createServer((req, res) => {
-  // Health check
-  if (req.method === "GET" && req.url === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok", deploying, service: SERVICE_NAME }));
-    return;
-  }
-
-  if (req.method !== "POST" || req.url !== "/webhook") {
-    res.writeHead(404);
-    res.end("Not found");
-    return;
-  }
-
-  let body = "";
-  req.on("data", (chunk) => (body += chunk));
-  req.on("end", () => {
-    // Verify GitHub signature
-    const signature = req.headers["x-hub-signature-256"];
-    if (!verifySignature(body, signature)) {
-      log("Invalid signature, rejecting request");
-      res.writeHead(401);
-      res.end("Invalid signature");
+function createWebhookServer({ secret, branch = "main", onPush, health = () => ({}), maxBodyBytes = 1024 * 1024 }) {
+  if (!secret) throw new Error("WEBHOOK_SECRET is required");
+  const server = http.createServer({ maxHeaderSize: 16 * 1024 }, (req, res) => {
+    const reply = (status, message) => {
+      res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(message);
+    };
+    if (req.method === "GET" && req.url === "/health") {
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ status: "ok", ...health() }));
       return;
     }
-
-    // Only deploy on push to target branch
-    const event = req.headers["x-github-event"];
-    if (event !== "push") {
-      log(`Ignoring event: ${event}`);
-      res.writeHead(200);
-      res.end("Ignored");
+    if (req.method !== "POST" || req.url !== "/webhook") return reply(404, "Not found");
+    let size = 0;
+    let oversized = false;
+    const chunks = [];
+    const rejectOversized = () => {
+      oversized = true;
+      chunks.length = 0;
+      res.setHeader("Connection", "close");
+      res.on("finish", () => req.destroy());
+      reply(413, "Request body too large");
+    };
+    if (Number(req.headers["content-length"]) > maxBodyBytes) {
+      rejectOversized();
+      req.resume();
       return;
     }
-
-    try {
-      const payload = JSON.parse(body);
-      const ref = payload.ref || "";
-      if (ref !== `refs/heads/${BRANCH}`) {
-        log(`Ignoring push to ${ref}, only deploying ${BRANCH}`);
-        res.writeHead(200);
-        res.end("Ignored");
-        return;
-      }
-
-      log(`Push to ${BRANCH} by ${payload.pusher?.name || "unknown"}: ${payload.head_commit?.message || ""}`);
-      deploy();
-      res.writeHead(200);
-      res.end("Deploying");
-    } catch (e) {
-      log(`Failed to parse payload: ${e.message}`);
-      res.writeHead(400);
-      res.end("Bad request");
-    }
+    req.on("data", (chunk) => {
+      if (oversized) return;
+      size += chunk.length;
+      if (size > maxBodyBytes) return rejectOversized();
+      chunks.push(chunk);
+    });
+    req.on("error", () => { if (!res.headersSent) reply(400, "Invalid request"); });
+    req.on("end", () => {
+      if (oversized) return;
+      const body = Buffer.concat(chunks);
+      if (!verifySignature(body, req.headers["x-hub-signature-256"], secret)) return reply(401, "Invalid signature");
+      if (req.headers["x-github-event"] !== "push") return reply(200, "Ignored");
+      let payload;
+      try { payload = JSON.parse(body.toString("utf8")); }
+      catch { return reply(400, "Invalid JSON"); }
+      if (!payload || typeof payload !== "object") return reply(400, "Invalid payload");
+      if (payload.ref !== `refs/heads/${branch}` || payload.deleted) return reply(200, "Ignored");
+      try { onPush(); reply(202, "Deployment queued"); }
+      catch { reply(500, "Could not queue deployment"); }
+    });
   });
-});
+  server.requestTimeout = 15_000;
+  server.headersTimeout = 10_000;
+  return server;
+}
 
-server.listen(PORT, () => {
-  log(`Webhook listener started on port ${PORT}`);
-  log(`Deploy dir: ${DEPLOY_DIR}`);
-  log(`Service: ${SERVICE_NAME}`);
-  log(`Branch: ${BRANCH}`);
-});
+function main() {
+  const secret = process.env.WEBHOOK_SECRET;
+  if (!secret) throw new Error("WEBHOOK_SECRET environment variable is required");
+  const port = Number(process.env.WEBHOOK_PORT || 9000);
+  const deployDir = process.env.DEPLOY_DIR || path.resolve(__dirname, "..");
+  const service = process.env.SERVICE_NAME || "dev-blog";
+  const logFile = path.join(__dirname, "deploy.log");
+  let deploying = false;
+  let pending = false;
+  const log = (message) => {
+    const line = `[${new Date().toISOString()}] ${message}`;
+    console.log(line);
+    try { fs.appendFileSync(logFile, line + "\n"); }
+    catch (error) { console.error("Could not write deployment log:", error.message); }
+  };
+  const deploy = () => {
+    if (deploying) { pending = true; return; }
+    deploying = true;
+    log("Deployment started");
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", path.join(__dirname, "deploy.ps1")],
+      { cwd: deployDir, windowsHide: true, encoding: "utf8", maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+        deploying = false;
+        log(error ? `Deployment failed: ${error.message}` : "Deployment completed");
+        if (stdout) log(stdout);
+        if (stderr) log(stderr);
+        if (pending) { pending = false; deploy(); }
+      });
+  };
+  const server = createWebhookServer({ secret, branch: process.env.DEPLOY_BRANCH || "main", onPush: deploy, health: () => ({ deploying, pending, service }) });
+  server.listen(port, "127.0.0.1", () => log(`Webhook listening on 127.0.0.1:${port}`));
+}
+if (require.main === module) main();
+module.exports = { verifySignature, createWebhookServer };

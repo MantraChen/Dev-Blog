@@ -8,7 +8,7 @@ const AUTH_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate, private",
 };
 
-export const DELETE: APIRoute = async ({ params, request }) => {
+export const DELETE: APIRoute = async ({ params, request, clientAddress }) => {
   if (!(await validateSession(request.headers.get("cookie")))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
@@ -24,13 +24,14 @@ export const DELETE: APIRoute = async ({ params, request }) => {
     });
   }
 
-  await deleteStatus(id);
+  const deleted = await deleteStatus(id);
+  if (!deleted.changes) return Response.json({ error: "Not found" }, { status: 404 });
 
   await createAuditLog({
     action: "status.delete",
     resource: "status",
     resourceId: String(id),
-    ip: getClientIp(request),
+    ip: getClientIp(clientAddress),
   });
 
   return new Response(JSON.stringify({ ok: true }), {

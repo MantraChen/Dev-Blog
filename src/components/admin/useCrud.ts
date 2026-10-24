@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 
-interface UseCrudOptions<T> {
+interface UseCrudOptions {
   endpoint: string;
 }
 
-export function useCrud<T extends { id: number }>({ endpoint }: UseCrudOptions<T>) {
+export function useCrud<T extends { id: number }>({ endpoint }: UseCrudOptions) {
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export function useCrud<T extends { id: number }>({ endpoint }: UseCrudOptions<T
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`Failed to save: ${res.status}`);
+      if (!res.ok) throw new Error((await res.json()).error || `Failed to save: ${res.status}`);
       await load();
       return true;
     } catch (e) {
@@ -48,7 +48,7 @@ export function useCrud<T extends { id: number }>({ endpoint }: UseCrudOptions<T
     setError(null);
     try {
       const res = await fetch(`${endpoint}/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`Failed to delete: ${res.status}`);
+      if (!res.ok) throw new Error((await res.json()).error || `Failed to delete: ${res.status}`);
       await load();
       return true;
     } catch (e) {

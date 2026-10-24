@@ -18,7 +18,7 @@ export function FriendsPanel() {
 
   useEffect(() => { load(); }, [load]);
 
-  const save = async (e: React.FormEvent<HTMLFormElement>) => {
+  const save = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const body = {

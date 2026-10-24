@@ -1,145 +1,72 @@
-# HowieSun - Personal Blog
+# Howie Sun — Dev Blog
 
-A personal technical blog built with Astro 6 SSR, deployed on Windows Server 2022 with Caddy reverse proxy.
+Personal technical blog built with Astro 7 SSR, React 19, Tailwind CSS 4, SQLite and Drizzle ORM. Markdown is stored in SQLite and rendered with marked, highlight.js, KaTeX and a final HTML allowlist sanitizer.
 
-## Tech Stack
+## Local development
 
-- **Framework**: Astro 6 SSR + Node.js standalone adapter
-- **Database**: SQLite (better-sqlite3) + Drizzle ORM
-- **Styling**: Tailwind CSS v4 + custom design tokens
-- **Content**: Markdown blog posts stored in SQLite, rendered server-side via `marked` with highlight.js code highlighting and KaTeX math rendering
-- **Islands**: React 19 (minimal client JS — TagFilter with search, ThemeToggle, AdminApp)
-- **Comments**: Giscus (GitHub Discussions) with automatic dark/light theme sync
-- **Deployment**: Windows Server 2022 + Caddy (auto HTTPS) + NSSM (service manager)
+Use **Node 24.22.1+ within Node 24** and npm. Patched Node 22 (22.23.4+) and Node 26 (26.12.1+) are also supported. Installation and build reject older vulnerable versions.
+
+```powershell
+npm ci
+npm run db:migrate
+npm run dev
+```
+
+The default local database is `data.db`. Set `DATABASE_PATH` to use another file. Migrations bootstrap new databases and adopt existing schemas without dropping content. Existing databases are backed up before pending migrations are applied.
+
+Set `ADMIN_PASSWORD_HASH` in the **server process environment** before starting the app. Use a bcrypt hash generated from a strong password, and keep it out of Git, logs and shell history. Production cookies are Secure, HttpOnly and SameSite=Strict; use HTTPS for admin access. A local HTTPS proxy is needed for admin testing on hosts that do not allow Secure cookies on localhost.
 
 ## Features
 
-### Blog
-- Full admin CRUD with markdown editor and live preview
-- Code syntax highlighting (highlight.js, github-dark theme)
-- Math formula rendering (KaTeX, inline `$...$` and block `$$...$$`)
-- Full-text search with 300ms debounce
-- Tag-based filtering
-- View count tracking per post
-- Emoji reactions per post
-- Previous/next post navigation
-- Reading progress bar and TOC sidebar (desktop sidebar + mobile drawer)
-- Giscus comment system with theme sync via MutationObserver
-- Archive page (posts grouped by year/month)
-- **Hidden posts**: unlisted from all listings (blog, archive, search, RSS, sitemap) but accessible via direct link
-- **404 redirect**: invalid blog slugs redirect to the 404 page
+- Admin CRUD for posts, projects, statuses, skills, timeline and friend links.
+- Markdown preview, explicit-language code highlighting, math, Unicode heading anchors, TOC and code copying.
+- Public posts paginated in groups of 20, with combined keyword search and tag filters.
+- Archives, RSS, sitemap, canonical/OG metadata and BlogPosting structured data.
+- Drafts are private. Hidden posts are unlisted and marked noindex, but accessible by direct URL.
+- Anonymous views deduplicated by a keyed network identifier and 30-minute bucket; emoji reactions deduplicated per network, post and emoji during their 90-day retention window. Shared IPs can undercount; these are approximate analytics.
+- Giscus comments, locally served Geist/KaTeX fonts, dark/light themes, responsive layout and native page transitions.
+- FTS5 substring search for 3+ characters; shorter Chinese/other queries retain literal substring matching in a bounded worker, away from the HTTP event loop.
 
-### Content Management
-- **Project showcase, skills overview, career timeline, blogroll (friends)** — all backed by SQLite
-- **Admin panel**: Session-based auth (bcrypt + HttpOnly cookies), 7 tabs — Blog, Projects, Statuses, Skills, Timeline, Friends, Stats
-- **Blog status cycle**: Draft (yellow) → Published (green) → Hidden (purple) — single-click toggle in admin
-- **Stats dashboard**: Total views, top posts ranking, daily views bar chart (last 30 days)
+## Validation and CI
 
-### UI & Responsive
-- Fully responsive mobile-first design with Tailwind CSS breakpoints
-- Mobile hamburger menu with smooth slide-down animation and outside-click-to-close
-- Dynamic favicon that follows dark/light theme switching
-- Smooth theme transition animation (optimized for performance — transitions only on key layout elements)
-- Interactive 404 page with canvas black hole animation (cursor-following, debris spaghettification, dodge button easter egg)
-- Hero entrance animations, scroll reveal effects, View Transitions
-- Skills page with auto-width labels (no truncation regardless of name length)
-
-### Security
-- Caddy reverse proxy with security response headers (CSP, X-Frame-Options, HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
-- Input validation on all API routes via Zod schemas
-- Login rate limiting (5 attempts per 15 minutes per IP)
-- Public API rate limiting (60 requests per minute per IP)
-- Request body size limit (1MB)
-- Audit logging on all admin operations (create/update/delete + login/logout events)
-- Secure HttpOnly session cookies with SameSite=Strict and 7-day expiry
-- Markdown raw HTML sanitization to prevent XSS
-- Strict ID parameter parsing on all API routes
-- Cache-Control: no-store on all authenticated API responses
-- SQLite database not accessible via HTTP
-- Git history cleaned of sensitive files (database, credentials)
-- Windows Server hardened: non-standard RDP port, account lockout policy, unnecessary services disabled, firewall restricted to 80/443/RDP only
-
-### Performance & SEO
-- SSR cache headers on all public pages (Cache-Control + stale-while-revalidate)
-- RSS feed, sitemap, SEO meta/OG tags
-- Dark mode with smooth transition, View Transitions, scroll reveal animations
-- Automatic DB schema migration on deploy via drizzle-kit push
-
-## Project Structure
-
+```powershell
+npm run check
+npm test
+npm run build
+# or the complete suite, including production HTTP validation:
+npm run verify
+npm audit
 ```
-src/
-  components/
-    layout/              # BaseLayout, Nav (with mobile hamburger menu)
-    blog/                # TagFilter with search, ReactionBar (React islands)
-    admin/               # AdminApp (React island, tab router)
-      panels/            # BlogPanel, ProjectsPanel, StatusesPanel, SkillsPanel, TimelinePanel, FriendsPanel, StatsPanel
-    ThemeToggle.tsx       # Dark/light mode toggle with smooth transition
-  db/
-    schema.ts            # Drizzle schema (posts, postViews, projects, statuses, skills, timeline, friends, reactions, adminSessions, auditLogs)
-    queries.ts           # Database queries (CRUD, search, view counts, reactions, stats, audit logs)
-    types.ts             # TypeScript interfaces
-  pages/
-    api/                 # REST API routes (auth, posts, posts/search, posts/views, projects, statuses, skills, timeline, friends, reactions, stats)
-    blog/                # Blog list + [slug] detail
-    projects/            # Project showcase
-    admin/               # Login + admin panel
-    skills.astro         # Skills/tech stack (auto-width labels)
-    timeline.astro       # Career timeline
-    archive.astro        # Posts archive by year/month
-    friends.astro        # Blogroll / friend links
-    404.astro            # Interactive black hole 404 page
-    rss.xml.ts           # RSS feed
-    sitemap.xml.ts       # Dynamic sitemap
-  lib/
-    auth.ts              # Session management, rate limiting, IP extraction
-    markdown.ts          # Configured marked renderer (highlight.js + KaTeX + heading IDs + GFM + HTML sanitization)
-    validation.ts        # Zod schemas for API input validation + safe body parser
-    utils.ts             # cn() helper
-  middleware.ts          # Security headers, public API rate limiting, body size limit
-  styles/globals.css     # Tailwind + CSS custom properties + mobile prose adjustments + theme transition
-```
+
+GitHub Actions runs checks, regression tests and builds on Linux and Windows. Windows tests exercise deployment control flow with mocked NSSM operations; production service management requires server validation.
+
+Security controls include streamed JSON body limits, schema validation, session cookies, same-origin mutation checks, bounded SQLite-backed rate limits shared across local processes, strict hash-based script CSP, no-store admin/API responses, Markdown sanitization and signed deployment webhooks. A dependency audit is one input to review, not proof of complete security.
+
+Astro's ClientRouter is intentionally disabled because it does not support the built-in CSP. Normal links and native browser transitions preserve navigation; React admin panels still work without full reloads within a panel. Styles retain inline permission for KaTeX and React; scripts never use `unsafe-inline` or `unsafe-eval`.
 
 ## Deployment
 
-Deployed on Windows Server 2022 Datacenter (2C2G) with:
+See [the Windows deployment guide](deploy/setup.md) and [Caddy example](deploy/Caddyfile.example). Configure an absolute database path, runtime password hash and loopback binding in NSSM before using the new pipeline.
 
-- **Node.js 22 LTS** running `dist/server/entry.mjs`
-- **NSSM** registering Node as a Windows service (auto-restart, boot start)
-- **Caddy** as reverse proxy (auto HTTPS via Let's Encrypt, security headers)
-- **Firewall**: only ports 80, 443, and custom RDP port open
-- **Auto-deploy**: GitHub webhook triggers `git pull` + `npm install` + `npm run build` + `drizzle-kit push` + service restart
+See [the environment assessment](docs/ENVIRONMENT.md) for the minimal-risk Linux alternative, and [the systemd template](deploy/linux/README.md) for a staged trial.
 
-### Deploy / Update
+Deployment builds a new release with `npm ci` and verifies it before stopping the running service. It backs up and migrates SQLite, switches NSSM, checks the exact release and restores the previous service configuration on failure. Old releases and backups are retained for recovery; monitor their disk usage.
 
-```powershell
-cd C:\sites\dev-blog
-git pull
-npm install
-npx drizzle-kit push --force
-npm run build
-nssm restart dev-blog
-```
+Never use `drizzle-kit push --force` against production. Add versioned migrations to `scripts/migrate.mjs`; keep applied migrations immutable. Existing historical Drizzle SQL files are retained for baseline adoption and regression tests.
 
-## Commands
+Raw views are retained for 30 days, reaction identities and audit logs for 90 days; daily view totals and reaction totals are kept. Background cleanup runs in batches every 15 minutes. For historical backlog, `npm run db:maintain` previews eligible records and `npm run db:maintain -- --apply` creates a verified backup before cleanup. `npm run doctor` checks the current process environment and database without printing secrets. Old code that only counts raw rows cannot display lifetime totals after cleanup; keep a rollback release that understands the aggregates.
 
-| Command                      | Action                                     |
-| :--------------------------- | :----------------------------------------- |
-| `npm install`                | Install dependencies                       |
-| `npm run dev`                | Start dev server at `localhost:4321`       |
-| `npm run build`              | Build production site to `./dist/`         |
-| `npm run preview`            | Preview production build locally           |
-| `npx drizzle-kit push`       | Push schema changes to SQLite DB           |
-| `npx drizzle-kit studio`     | Visual DB explorer                         |
+## Structure
 
-## Environment Variables
-
-```env
-ADMIN_PASSWORD_HASH=<bcrypt hash for admin login>
-```
-
-Generate a hash: `node -e "console.log(require('bcryptjs').hashSync('yourpassword', 10))"`
+- `src/pages`: SSR pages and JSON endpoints
+- `src/components`: public UI and React admin panels
+- `src/lib`: authentication, validation, Markdown and request helpers
+- `src/db`: SQLite connection, schema and queries
+- `scripts/migrate.mjs`, `migrations`: versioned database migration runner
+- `tests`: security, API, data migration and deployment regressions
+- `deploy`: webhook, staged release script and Windows setup
+- `docs/REVIEW.md`: code review findings, validation and remaining risks
 
 ## License
 
-[MIT](LICENSE)
+Source code: [MIT](LICENSE). Blog content displays CC BY-NC 4.0 attribution in the footer.

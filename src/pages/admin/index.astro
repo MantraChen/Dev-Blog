@@ -24,8 +24,8 @@ if (!isAuthenticated) {
     <AdminApp client:load />
   </div>
 
-  <script is:inline>
-    document.getElementById('logout-btn').addEventListener('click', async () => {
+  <script>
+    document.getElementById('logout-btn')!.addEventListener('click', async () => {
       await fetch('/api/auth/logout', { method: 'POST' });
       window.location.href = '/admin/login';
     });

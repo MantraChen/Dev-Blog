@@ -1,19 +1,25 @@
 import { z } from "zod";
 
+export const loginSchema = z.object({ password: z.string().min(1).max(1024) });
+
 // ─── Shared Helpers ─────────────────────────────────────────────────
 
 /** Parse a route param as a positive integer, or return null */
 export function parseId(raw: string | undefined): number | null {
-  const id = parseInt(raw || "", 10);
-  return Number.isInteger(id) && id > 0 ? id : null;
+  if (!raw || !/^[1-9]\d*$/.test(raw)) return null;
+  const id = Number(raw);
+  return Number.isSafeInteger(id) ? id : null;
 }
 
 const httpUrl = z
-  .string()
   .url()
   .refine((u) => u.startsWith("http://") || u.startsWith("https://"), {
     message: "URL must start with http:// or https://",
   });
+
+const tags = z.array(z.string().trim().min(1).max(50)).max(20).transform(values => [...new Set(values)]);
+const publishedDate = z.union([z.iso.date(), z.iso.datetime({ offset: true })])
+  .transform(value => new Date(value).toISOString());
 
 // ─── Posts ───────────────────────────────────────────────────────────
 
@@ -28,11 +34,11 @@ export const createPostSchema = z.object({
   coverImage: httpUrl.nullable().default(null),
   series: z.string().max(100).nullable().default(null),
   content: z.string().max(500_000).default(""),
-  tags: z.array(z.string().max(50)).max(20).default([]),
+  tags: tags.default([]),
   featured: z.boolean().default(false),
   draft: z.boolean().default(true),
   hidden: z.boolean().default(false),
-  publishedAt: z.string().max(50).default(() => new Date().toISOString()),
+  publishedAt: publishedDate.default(() => new Date().toISOString()),
 });
 
 export const updatePostSchema = z.object({
@@ -46,11 +52,11 @@ export const updatePostSchema = z.object({
   coverImage: httpUrl.nullable(),
   series: z.string().max(100).nullable(),
   content: z.string().max(500_000),
-  tags: z.array(z.string().max(50)).max(20),
+  tags,
   featured: z.boolean(),
   draft: z.boolean(),
   hidden: z.boolean(),
-  publishedAt: z.string().max(50),
+  publishedAt: publishedDate,
 }).partial();
 
 // ─── Projects ───────────────────────────────────────────────────────
@@ -64,7 +70,12 @@ export const createProjectSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateProjectSchema = createProjectSchema.partial();
+export const updateProjectSchema = createProjectSchema.extend({
+  techStack: createProjectSchema.shape.techStack.unwrap(),
+  demoUrl: createProjectSchema.shape.demoUrl.unwrap(),
+  repoUrl: createProjectSchema.shape.repoUrl.unwrap(),
+  sortOrder: createProjectSchema.shape.sortOrder.unwrap(),
+}).partial();
 
 // ─── Skills ─────────────────────────────────────────────────────────
 
@@ -76,7 +87,11 @@ export const createSkillSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateSkillSchema = createSkillSchema.partial();
+export const updateSkillSchema = createSkillSchema.extend({
+  level: createSkillSchema.shape.level.unwrap(),
+  iconSlug: createSkillSchema.shape.iconSlug.unwrap(),
+  sortOrder: createSkillSchema.shape.sortOrder.unwrap(),
+}).partial();
 
 // ─── Friends ────────────────────────────────────────────────────────
 
@@ -88,7 +103,11 @@ export const createFriendSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateFriendSchema = createFriendSchema.partial();
+export const updateFriendSchema = createFriendSchema.extend({
+  avatar: createFriendSchema.shape.avatar.unwrap(),
+  description: createFriendSchema.shape.description.unwrap(),
+  sortOrder: createFriendSchema.shape.sortOrder.unwrap(),
+}).partial();
 
 // ─── Statuses ───────────────────────────────────────────────────────
 
@@ -112,13 +131,17 @@ export const createTimelineSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(1).max(2000),
   type: z.enum(timelineTypes),
-  date: z.string().min(1).max(50),
-  tags: z.array(z.string().max(50)).max(20).nullable().default(null),
+  date: z.iso.date(),
+  tags: tags.nullable().default(null),
   url: httpUrl.nullable().default(null),
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateTimelineSchema = createTimelineSchema.partial();
+export const updateTimelineSchema = createTimelineSchema.extend({
+  tags: createTimelineSchema.shape.tags.unwrap(),
+  url: createTimelineSchema.shape.url.unwrap(),
+  sortOrder: createTimelineSchema.shape.sortOrder.unwrap(),
+}).partial();
 
 // ─── Reactions ──────────────────────────────────────────────────────
 
@@ -143,13 +166,39 @@ export const viewSchema = z.object({
 
 export async function safeParseBody<T>(
   request: Request,
-  schema: z.ZodSchema<T>,
-): Promise<{ success: true; data: T } | { success: false; error: string }> {
+  schema: z.ZodType<T>,
+): Promise<{ success: true; data: T } | { success: false; error: string; status: number }> {
+  if (request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() !== "application/json") {
+    return { success: false, error: "Content-Type must be application/json", status: 415 };
+  }
+  const maxBytes = 1024 * 1024;
+  if (Number(request.headers.get("content-length")) > maxBytes) {
+    return { success: false, error: "Request body too large", status: 413 };
+  }
   let raw: unknown;
+  const reader = request.body?.getReader();
   try {
-    raw = await request.json();
-  } catch {
-    return { success: false, error: "Invalid JSON body" };
+    if (!reader) return { success: false, error: "JSON body required", status: 400 };
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > maxBytes) {
+        void reader.cancel().catch(() => {});
+        return { success: false, error: "Request body too large", status: 413 };
+      }
+      chunks.push(chunk.value);
+    }
+    raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Body size limit exceeded:")) {
+      return { success: false, error: "Request body too large", status: 413 };
+    }
+    return { success: false, error: "Invalid JSON body", status: 400 };
+  } finally {
+    reader?.releaseLock();
   }
 
   const result = schema.safeParse(raw);
@@ -157,7 +206,7 @@ export async function safeParseBody<T>(
     const message = result.error.issues
       .map((i) => `${i.path.join(".")}: ${i.message}`)
       .join("; ");
-    return { success: false, error: message };
+    return { success: false, error: message, status: 400 };
   }
 
   return { success: true, data: result.data };

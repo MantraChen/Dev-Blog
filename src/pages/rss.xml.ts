@@ -1,19 +1,22 @@
 import rss from "@astrojs/rss";
-import { getPublishedPosts } from "@/db/queries";
+import { getPublishedPostMetadata } from "@/db/queries";
 import type { APIContext } from "astro";
+import { feedDate } from "@/lib/feed-format";
 
 export async function GET(context: APIContext) {
-  const posts = await getPublishedPosts();
+  const posts = await getPublishedPostMetadata();
 
-  return rss({
-    title: "Dev Blog",
-    description: "Personal tech blog",
+  const response = await rss({
+    title: "Howie Sun | Tech Blog",
+    description: "Systems programming and engineering notes by Howie Sun",
     site: context.site!,
     items: posts.map((post) => ({
       title: post.title,
-      pubDate: new Date(post.publishedAt),
+      pubDate: feedDate(post.publishedAt) ? new Date(feedDate(post.publishedAt)!) : undefined,
       description: post.description || post.title,
-      link: `/blog/${post.slug}/`,
+      link: `/blog/${encodeURIComponent(post.slug)}`,
     })),
   });
+  response.headers.set("Cache-Control", "no-cache");
+  return response;
 }

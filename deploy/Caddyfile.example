@@ -1,7 +1,11 @@
-yourdomain.com {
+howielog.com {
     # Webhook (must be before the catch-all)
-    reverse_proxy /webhook localhost:9000
+    reverse_proxy /webhook 127.0.0.1:9000
 
     # Blog
-    reverse_proxy * localhost:4321
+    reverse_proxy 127.0.0.1:4321 {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
 }
