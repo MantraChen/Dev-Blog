@@ -24,7 +24,8 @@ export const DELETE: APIRoute = async ({ params, request, clientAddress }) => {
     });
   }
 
-  await deleteStatus(id);
+  const deleted = await deleteStatus(id);
+  if (!deleted.changes) return Response.json({ error: "Not found" }, { status: 404 });
 
   await createAuditLog({
     action: "status.delete",

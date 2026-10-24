@@ -82,7 +82,7 @@ export function BlogPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to save post");
       toast.success(editing ? "Post updated successfully" : "Post created successfully");
       setEditing(null);
       setShowForm(false);
@@ -91,8 +91,8 @@ export function BlogPanel() {
       setSlug("");
       setCoverImage("");
       load();
-    } catch {
-      toast.error(editing ? "Failed to update post" : "Failed to create post");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save post");
     }
   };
 

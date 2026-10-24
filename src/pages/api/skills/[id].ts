@@ -32,7 +32,9 @@ export const PUT: APIRoute = async ({ params, request, clientAddress }) => {
     });
   }
 
+  if (!Object.keys(parsed.data).length) return Response.json({ error: "No fields to update" }, { status: 400 });
   const result = await updateSkill(id, parsed.data);
+  if (!result.length) return Response.json({ error: "Not found" }, { status: 404 });
 
   await createAuditLog({
     action: "skill.update",
@@ -62,7 +64,8 @@ export const DELETE: APIRoute = async ({ params, request, clientAddress }) => {
     });
   }
 
-  await deleteSkill(id);
+  const deleted = await deleteSkill(id);
+  if (!deleted.changes) return Response.json({ error: "Not found" }, { status: 404 });
 
   await createAuditLog({
     action: "skill.delete",

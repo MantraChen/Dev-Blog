@@ -25,9 +25,12 @@ export const onRequest = defineMiddleware(async ({ request, clientAddress }, nex
       } catch (error) {
         if (!path.startsWith("/api/")) throw error;
         // Do not disclose SQL, content, credentials or stack traces in API responses.
-        const code = (error as { code?: string })?.code;
+        const failure = error as { code?: string; cause?: { code?: string } };
+        const code = failure?.code ?? failure?.cause?.code;
         console.error("API request failed", path, code ?? "unknown");
-        response = jsonError("Request failed. Please try again.", 500);
+        response = code === "SQLITE_CONSTRAINT_UNIQUE"
+          ? jsonError("This value already exists. Choose a different slug.", 409)
+          : jsonError("Request failed. Please try again.", 500);
       }
     }
   }
