@@ -192,7 +192,10 @@ export async function safeParseBody<T>(
       chunks.push(chunk.value);
     }
     raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Body size limit exceeded:")) {
+      return { success: false, error: "Request body too large", status: 413 };
+    }
     return { success: false, error: "Invalid JSON body", status: 400 };
   } finally {
     reader?.releaseLock();

@@ -29,5 +29,8 @@ test("body parsing rejects malformed JSON, unsupported types and oversized chunk
   } });
   const large = await safeParseBody(request(stream), schema);
   assert.equal(!large.success && large.status, 413);
+  const rejected = new ReadableStream({ start(controller) { controller.error(new Error("Body size limit exceeded: received more than 1048576 bytes")); } });
+  const adapterLimited = await safeParseBody(request(rejected), schema);
+  assert.equal(!adapterLimited.success && adapterLimited.status, 413);
   assert.deepEqual(await safeParseBody(request('{"text":"你好"}'), schema), { success: true, data: { text: "你好" } });
 });
