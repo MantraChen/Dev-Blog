@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
-import { recordPostView, getPostViewCount } from "@/db/queries";
+import { recordPostView, getPostViewCount, getPublicPostIdentity } from "@/db/queries";
+import { getVisitor } from "@/lib/visitor";
 import { viewSchema, safeParseBody } from "@/lib/validation";
 
 export const GET: APIRoute = async ({ url }) => {
@@ -12,9 +13,10 @@ export const GET: APIRoute = async ({ url }) => {
     });
   }
 
+  if (!(await getPublicPostIdentity(slug))) return new Response(null, { status: 404 });
   const count = await getPostViewCount(slug);
   return new Response(JSON.stringify({ slug, views: count }), {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 };
 
@@ -27,11 +29,14 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  await recordPostView(parsed.data.slug);
+  const post = await getPublicPostIdentity(parsed.data.slug);
+  if (!post) return new Response(null, { status: 404 });
+  const visitor = getVisitor(request);
+  await recordPostView(post.id, post.slug, visitor.key, visitor.bucket);
   const count = await getPostViewCount(parsed.data.slug);
 
   return new Response(JSON.stringify({ slug: parsed.data.slug, views: count }), {
     status: 200,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "Set-Cookie": visitor.cookie },
   });
 };

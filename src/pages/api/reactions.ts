@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { addReaction, getReactionCounts } from "@/db/queries";
+import { addReaction, getReactionCounts, getPublicPostIdentity } from "@/db/queries";
 import { reactionSchema, safeParseBody } from "@/lib/validation";
 
 export const GET: APIRoute = async ({ url }) => {
@@ -11,9 +11,10 @@ export const GET: APIRoute = async ({ url }) => {
     });
   }
 
+  if (!(await getPublicPostIdentity(slug))) return new Response(null, { status: 404 });
   const counts = await getReactionCounts(slug);
   return new Response(JSON.stringify(counts), {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 };
 
@@ -26,11 +27,13 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  await addReaction(parsed.data.slug, parsed.data.emoji);
+  const post = await getPublicPostIdentity(parsed.data.slug);
+  if (!post) return new Response(null, { status: 404 });
+  await addReaction(post.id, post.slug, parsed.data.emoji);
   const counts = await getReactionCounts(parsed.data.slug);
 
   return new Response(JSON.stringify(counts), {
     status: 201,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 };

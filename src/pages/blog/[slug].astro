@@ -1,6 +1,6 @@
 ---
 import BaseLayout from "@/components/layout/BaseLayout.astro"
-import { getPostBySlug, getPostViewCount, recordPostView, getAdjacentPosts } from "@/db/queries"
+import { getPostBySlug, getPostViewCount, getAdjacentPosts } from "@/db/queries"
 import { renderMarkdown } from "@/lib/markdown"
 import { estimateReadingTime } from "@/lib/utils"
 import { ReactionBar } from "@/components/blog/ReactionBar"
@@ -14,7 +14,6 @@ if (!post || post.draft) {
 }
 
 // 记录浏览量并获取计数和前后文章
-await recordPostView(slug!)
 const viewCount = await getPostViewCount(slug!)
 const { prev, next } = await getAdjacentPosts(slug!)
 
@@ -48,7 +47,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
   <div id="reading-progress"></div>
 
   <div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 flex gap-10">
-    <article class="flex-1 min-w-0">
+    <article class="flex-1 min-w-0" data-post-slug={slug}>
 
       <header class="mb-10 reveal">
         {post.coverImage && (
@@ -69,7 +68,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
                 <span>·</span>
                 <span>{readingTime} min read</span>
                 <span>·</span>
-                <span>{viewCount} 次阅读</span>
+                <span><span data-post-views>{viewCount}</span> views</span>
               </div>
               <div class="flex flex-wrap gap-2 mt-3">
                 {post.tags.map((tag) => (
@@ -89,7 +88,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
               <span>·</span>
               <span>{readingTime} min read</span>
               <span>·</span>
-              <span>{viewCount} 次阅读</span>
+              <span><span data-post-views>{viewCount}</span> views</span>
             </div>
             <div class="flex flex-wrap gap-2 mt-4">
               {post.tags.map((tag) => (
@@ -338,5 +337,22 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=600, stale-while-re
       initBlogEnhancements();
       initMobileTOC();
     });
+  </script>
+  <script>
+    function recordVisibleVisit() {
+      const article = document.querySelector<HTMLElement>('[data-post-slug]');
+      if (!article || article.dataset.viewRecorded || document.visibilityState !== 'visible') return;
+      article.dataset.viewRecorded = 'true';
+      fetch('/api/posts/views', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: article.dataset.postSlug }),
+      }).then(async response => {
+        if (!response.ok) return;
+        const { views } = await response.json();
+        article.querySelectorAll('[data-post-views]').forEach(element => { element.textContent = String(views); });
+      }).catch(() => { /* Reading remains available when analytics are offline. */ });
+    }
+    document.addEventListener('astro:page-load', recordVisibleVisit);
+    document.addEventListener('visibilitychange', recordVisibleVisit);
   </script>
 </BaseLayout>

@@ -1,4 +1,4 @@
-import { sqliteTable, text, int } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, int, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 // ─── Projects ────────────────────────────────────────────────────────
@@ -55,11 +55,18 @@ export const timeline = sqliteTable("timeline", {
 // ─── Post Views ─────────────────────────────────────────────────────
 export const postViews = sqliteTable("post_views", {
   id: int().primaryKey({ autoIncrement: true }),
+  postId: int().references(() => posts.id, { onDelete: "cascade" }),
+  visitorKey: text(),
+  viewBucket: int(),
   slug: text().notNull(),
   createdAt: text()
     .notNull()
     .default(sql`(datetime('now'))`),
-});
+}, (table) => [
+  uniqueIndex("post_views_visitor_bucket").on(table.postId, table.visitorKey, table.viewBucket),
+  index("post_views_post_created").on(table.postId, table.createdAt),
+  index("post_views_created").on(table.createdAt),
+]);
 
 // ─── Posts ───────────────────────────────────────────────────────────
 export const posts = sqliteTable("posts", {
@@ -99,12 +106,13 @@ export const friends = sqliteTable("friends", {
 // ─── Reactions ──────────────────────────────────────────────────────
 export const reactions = sqliteTable("reactions", {
   id: int().primaryKey({ autoIncrement: true }),
+  postId: int().references(() => posts.id, { onDelete: "cascade" }),
   slug: text().notNull(),
   emoji: text().notNull(), // 👍 🎉 ❤️ 🚀 👀 🤔
   createdAt: text()
     .notNull()
     .default(sql`(datetime('now'))`),
-});
+}, (table) => [index("reactions_post_emoji").on(table.postId, table.emoji)]);
 
 // ─── Admin Sessions ──────────────────────────────────────────────────
 export const adminSessions = sqliteTable("admin_sessions", {

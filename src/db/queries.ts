@@ -266,15 +266,21 @@ export async function deletePost(id: number) {
 
 // ─── Post Views ─────────────────────────────────────────────────────
 
-export async function recordPostView(slug: string) {
-  return db.insert(postViews).values({ slug });
+export async function getPublicPostIdentity(slug: string) {
+  return db.select({ id: posts.id, slug: posts.slug }).from(posts)
+    .where(and(eq(posts.slug, slug), eq(posts.draft, false))).get();
+}
+
+export async function recordPostView(postId: number, slug: string, visitorKey: string, viewBucket: number) {
+  return db.insert(postViews).values({ postId, slug, visitorKey, viewBucket }).onConflictDoNothing();
 }
 
 export async function getPostViewCount(slug: string): Promise<number> {
   const rows = await db
     .select({ count: count() })
     .from(postViews)
-    .where(eq(postViews.slug, slug));
+    .innerJoin(posts, eq(postViews.postId, posts.id))
+    .where(eq(posts.slug, slug));
   return rows[0]?.count ?? 0;
 }
 
@@ -339,15 +345,16 @@ export async function deleteFriend(id: number) {
 
 // ─── Reactions ──────────────────────────────────────────────────────
 
-export async function addReaction(slug: string, emoji: string) {
-  return db.insert(reactions).values({ slug, emoji });
+export async function addReaction(postId: number, slug: string, emoji: string) {
+  return db.insert(reactions).values({ postId, slug, emoji });
 }
 
 export async function getReactionCounts(slug: string): Promise<Record<string, number>> {
   const rows = await db
     .select({ emoji: reactions.emoji, count: count() })
     .from(reactions)
-    .where(eq(reactions.slug, slug))
+    .innerJoin(posts, eq(reactions.postId, posts.id))
+    .where(eq(posts.slug, slug))
     .groupBy(reactions.emoji);
   return Object.fromEntries(rows.map((r) => [r.emoji, r.count]));
 }
@@ -355,23 +362,19 @@ export async function getReactionCounts(slug: string): Promise<Record<string, nu
 // ─── Stats ──────────────────────────────────────────────────────────
 
 export async function getTotalViews(): Promise<number> {
-  const rows = await db.select({ count: count() }).from(postViews);
+  const rows = await db.select({ count: count() }).from(postViews).innerJoin(posts, eq(postViews.postId, posts.id));
   return rows[0]?.count ?? 0;
 }
 
 export async function getTopPosts(limit = 10) {
   const rows = await db
-    .select({ slug: postViews.slug, views: count() })
+    .select({ slug: posts.slug, title: posts.title, views: count() })
     .from(postViews)
-    .groupBy(postViews.slug)
+    .innerJoin(posts, eq(postViews.postId, posts.id))
+    .groupBy(posts.id)
     .orderBy(desc(count()))
     .limit(limit);
-  // Enrich with post titles
-  const allPosts = await db
-    .select({ slug: posts.slug, title: posts.title })
-    .from(posts);
-  const titleMap = Object.fromEntries(allPosts.map((p) => [p.slug, p.title]));
-  return rows.map((r) => ({ slug: r.slug, title: titleMap[r.slug] || r.slug, views: r.views }));
+  return rows;
 }
 
 export async function getViewsByDay(days = 30) {
@@ -381,7 +384,8 @@ export async function getViewsByDay(days = 30) {
       views: count(),
     })
     .from(postViews)
-    .where(sql`${postViews.createdAt} >= ${new Date(Date.now() - days * 86400_000).toISOString()}`)
+    .innerJoin(posts, eq(postViews.postId, posts.id))
+    .where(sql`${postViews.createdAt} >= ${new Date(Date.now() - days * 86400_000).toISOString().replace("T", " ").slice(0, 19)}`)
     .groupBy(sql`date(${postViews.createdAt})`)
     .orderBy(sql`date(${postViews.createdAt})`);
   return rows;

@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 const baseline = readFileSync(new URL("../migrations/001-baseline.sql", import.meta.url), "utf8");
 // Released migrations are immutable. Add a new entry for each schema change.
@@ -13,6 +13,22 @@ const migrations = [{
     for (const [name, definition] of [["coverImage", "TEXT"], ["series", "TEXT"], ["hidden", "INTEGER NOT NULL DEFAULT 0"]]) {
       if (!columns.has(name)) db.exec(`ALTER TABLE posts ADD COLUMN ${name} ${definition}`);
     }
+  },
+}, {
+  id: "002-engagement-identity",
+  up(db) {
+    for (const table of ["post_views", "reactions"]) {
+      const columns = new Set(db.pragma(`table_info(${table})`).map(column => column.name));
+      if (!columns.has("postId")) db.exec(`ALTER TABLE ${table} ADD COLUMN postId INTEGER REFERENCES posts(id) ON DELETE CASCADE`);
+      db.exec(`UPDATE ${table} SET postId = (SELECT id FROM posts WHERE posts.slug = ${table}.slug) WHERE postId IS NULL`);
+    }
+    const columns = new Set(db.pragma("table_info(post_views)").map(column => column.name));
+    if (!columns.has("visitorKey")) db.exec("ALTER TABLE post_views ADD COLUMN visitorKey TEXT");
+    if (!columns.has("viewBucket")) db.exec("ALTER TABLE post_views ADD COLUMN viewBucket INTEGER");
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS post_views_visitor_bucket ON post_views(postId, visitorKey, viewBucket);
+      CREATE INDEX IF NOT EXISTS post_views_post_created ON post_views(postId, createdAt);
+      CREATE INDEX IF NOT EXISTS post_views_created ON post_views(createdAt);
+      CREATE INDEX IF NOT EXISTS reactions_post_emoji ON reactions(postId, emoji);`);
   },
 }];
 
