@@ -8,10 +8,17 @@ export default defineConfig({
   output: 'server',
   compressHTML: true,
   security: {
-    checkOrigin: false,
+    checkOrigin: true,
+    allowedDomains: [
+      { protocol: 'https', hostname: 'howielog.com' },
+      { protocol: 'http', hostname: 'localhost' },
+      { protocol: 'http', hostname: '127.0.0.1' },
+    ],
   },
+  server: { host: '127.0.0.1' },
   adapter: node({
     mode: 'standalone',
+    bodySizeLimit: 1024 * 1024,
   }),
   integrations: [react()],
   vite: {

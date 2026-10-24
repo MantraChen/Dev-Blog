@@ -3,13 +3,12 @@ import { login, makeSessionCookie, checkRateLimit, clearRateLimit, getClientIp }
 import { createAuditLog } from "@/db/queries";
 import { loginSchema, safeParseBody } from "@/lib/validation";
 
-export const POST: APIRoute = async ({ request }) => {
-  const ip = getClientIp(request);
+export const POST: APIRoute = async ({ request, clientAddress }) => {
+  const ip = getClientIp(clientAddress);
 
   // Rate limit check
   const rateCheck = checkRateLimit(ip);
   if (!rateCheck.allowed) {
-    await createAuditLog({ action: "login.rate_limited", ip });
     return new Response(
       JSON.stringify({ error: `Too many attempts. Try again in ${rateCheck.retryAfterSeconds}s` }),
       {
