@@ -107,15 +107,16 @@
 }
 
 /* ─── Scroll Reveal ────────────────────────────────────────────────── */
-.reveal {
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+/* Content stays readable before JavaScript runs and if an observer fails. */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-active {
+    animation: reveal-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
 }
-.reveal-active {
-  opacity: 1;
-  transform: translateY(0);
+
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ─── Reading Progress Bar ─────────────────────────────────────────── */
@@ -221,5 +222,13 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-animate {
+    opacity: 1;
+    transform: none;
+    animation: none;
   }
 }
