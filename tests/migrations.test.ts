@@ -1,8 +1,34 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import Database from "better-sqlite3";
-import { readFileSync } from "node:fs";
-import { migrate, pendingMigrations } from "../scripts/migrate.mjs";
+import { readFileSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { migrate, pendingMigrations, migrateFile } from "../scripts/migrate.mjs";
+
+test("file migrations back up committed WAL content before schema changes", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "devblog-backup-test-"));
+  const filename = join(directory, "test.db");
+  const source = new Database(filename);
+  try {
+    source.pragma("journal_mode = WAL");
+    source.exec("CREATE TABLE proof(value TEXT); INSERT INTO proof VALUES ('committed in WAL')");
+    await migrateFile(filename);
+    const backupPath = join(`${filename}.backups`, readdirSync(`${filename}.backups`)[0]);
+    const backup = new Database(backupPath, { readonly: true });
+    try {
+      assert.deepEqual(backup.prepare("SELECT value FROM proof").get(), { value: "committed in WAL" });
+      assert.equal(backup.prepare("SELECT name FROM sqlite_master WHERE name = 'app_migrations'").get(), undefined);
+      assert.deepEqual(backup.pragma("integrity_check"), [{ integrity_check: "ok" }]);
+    } finally { backup.close(); }
+    await migrateFile(filename);
+    assert.equal(readdirSync(`${filename}.backups`).filter(file => file.endsWith(".db")).length, 1);
+  } finally {
+    source.close();
+    // The exact temporary directory is created by this test, never a caller-supplied path.
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("migration bootstraps a fresh database and is idempotent", () => {
   const db = new Database(":memory:");
