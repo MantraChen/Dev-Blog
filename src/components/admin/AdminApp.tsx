@@ -7,14 +7,24 @@ import { SkillsPanel } from "./panels/SkillsPanel";
 import { TimelinePanel } from "./panels/TimelinePanel";
 import { FriendsPanel } from "./panels/FriendsPanel";
 import { StatsPanel } from "./panels/StatsPanel";
+import { ToolsPanel } from "./panels/ToolsPanel";
 
-type Tab = "blog" | "projects" | "statuses" | "skills" | "timeline" | "friends" | "stats";
+type Tab =
+  | "blog"
+  | "projects"
+  | "statuses"
+  | "skills"
+  | "timeline"
+  | "friends"
+  | "stats"
+  | "tools";
 
 export function AdminApp() {
   const [activeTab, setActiveTab] = useState<Tab>("blog");
 
   const tabs: { value: Tab; label: string }[] = [
     { value: "blog", label: "Blog" },
+    { value: "tools", label: "Content tools" },
     { value: "projects", label: "Projects" },
     { value: "statuses", label: "Statuses" },
     { value: "skills", label: "Skills" },
@@ -43,6 +53,7 @@ export function AdminApp() {
       </div>
 
       {activeTab === "blog" && <BlogPanel />}
+      {activeTab === "tools" && <ToolsPanel />}
       {activeTab === "projects" && <ProjectsPanel />}
       {activeTab === "statuses" && <StatusesPanel />}
       {activeTab === "skills" && <SkillsPanel />}

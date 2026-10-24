@@ -7,13 +7,20 @@ migrate(sqlite);
 const { POST: view } = await import("../src/pages/api/posts/views");
 const { POST: react } = await import("../src/pages/api/reactions");
 const queries = await import("../src/db/queries");
-const insert = sqlite.prepare("INSERT INTO posts(title, slug, draft) VALUES (?, ?, ?)");
+const insert = sqlite.prepare(
+  "INSERT INTO posts(title, slug, draft) VALUES (?, ?, ?)",
+);
 insert.run("Public", "public", 0);
 insert.run("Draft", "draft", 1);
-const context = (slug: string, cookie = "") => ({
-  clientAddress: "192.0.2.10",
-  request: new Request("https://example.com/api/posts/views", { method: "POST", headers: { "content-type": "application/json", cookie }, body: JSON.stringify({ slug, emoji: "👍" }) }),
-}) as Parameters<typeof view>[0];
+const context = (slug: string, cookie = "") =>
+  ({
+    clientAddress: "192.0.2.10",
+    request: new Request("https://example.com/api/posts/views", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ slug, emoji: "👍" }),
+    }),
+  }) as Parameters<typeof view>[0];
 
 test("unpublished and nonexistent posts cannot accumulate views or reactions", async () => {
   for (const slug of ["missing", "draft"]) {
@@ -40,6 +47,9 @@ test("repeat visits are deduplicated and statistics survive slug changes", async
   assert.deepEqual(await queries.getReactionCounts("renamed"), { "👍": 1 });
   assert.equal((await queries.getTopPosts())[0].slug, "renamed");
   await queries.deletePost(post!.id);
+  assert.equal(await queries.getTotalViews(), 1, "Trash retains statistics");
+  assert.equal((await view(context("renamed"))).status, 404);
+  queries.purgePost(post!.id);
   assert.equal(await queries.getTotalViews(), 0);
   assert.equal(sqlite.prepare("SELECT * FROM reactions").all().length, 0);
 });

@@ -23,6 +23,7 @@ data.db-wal
 *.sqlite
 *.sqlite3
 *.db.backups/
+*.full-backups/
 deploy/*.log
 
 # environment variables

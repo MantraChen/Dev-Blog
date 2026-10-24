@@ -1,0 +1,9 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { getProjectBySlug } from '@/db/queries';
+import { renderMarkdown } from '@/lib/markdown';
+import { withBase } from '@/lib/site-path';
+const project=await getProjectBySlug(Astro.params.slug!);
+if(!project)return Astro.rewrite(withBase('/404'));
+---
+<BaseLayout title={`${project.name} | Project retrospective`} description={project.description}><article class="mx-auto max-w-4xl space-y-6 py-8"><a class="text-sm underline" href={withBase('/projects')}>← Projects</a><h1 class="text-3xl font-bold">{project.name}</h1><p class="text-muted-foreground">{project.description}</p><div class="flex flex-wrap gap-2">{project.techStack.map(tech=><span class="rounded-full border px-3 py-1 text-xs">{tech}</span>)}</div><div class="flex gap-5 text-sm">{project.demoUrl&&<a class="underline" href={project.demoUrl} rel="noreferrer" target="_blank">Open demo</a>}{project.repoUrl&&<a class="underline" href={project.repoUrl} rel="noreferrer" target="_blank">Source code</a>}{project.completedAt&&<time>Completed {project.completedAt}</time>}</div><div class="prose prose-zinc dark:prose-invert max-w-none"><Fragment set:html={renderMarkdown(project.content||'Project notes are coming soon.')} /></div></article></BaseLayout>

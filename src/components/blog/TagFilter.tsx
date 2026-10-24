@@ -2,18 +2,42 @@ import { withBase, contentUrl } from "@/lib/site-path";
 import React, { useState, useEffect } from "react";
 
 import type { PostSummary } from "@/lib/post-summary";
+import { Highlight } from "./Highlight";
 
 interface Props {
   posts: PostSummary[];
   tags: string[];
   tagCounts: Record<string, number>;
-  initialQuery: string; initialTag: string; initialPage: number; initialTotal: number;
+  initialQuery: string;
+  initialTag: string;
+  initialPage: number;
+  initialTotal: number;
+  initialYear: string;
+  initialSeries: string;
+  years: string[];
+  seriesOptions: string[];
 }
 
-export function TagFilter({ posts, tags, tagCounts, initialQuery, initialTag, initialPage, initialTotal }: Props) {
+export function TagFilter({
+  posts,
+  tags,
+  tagCounts,
+  initialQuery,
+  initialTag,
+  initialPage,
+  initialTotal,
+  initialYear,
+  initialSeries,
+  years,
+  seriesOptions,
+}: Props) {
+  const [year, setYear] = useState(initialYear),
+    [series, setSeries] = useState(initialSeries);
   const [activeTag, setActiveTag] = useState<string | null>(initialTag || null);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
-  const [searchResults, setSearchResults] = useState<PostSummary[] | null>(null);
+  const [searchResults, setSearchResults] = useState<PostSummary[] | null>(
+    null,
+  );
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -22,7 +46,20 @@ export function TagFilter({ posts, tags, tagCounts, initialQuery, initialTag, in
   useEffect(() => {
     const query = searchQuery.trim();
     setSearchError(null);
-    if (query === initialQuery && (activeTag || "") === initialTag && page === initialPage) {
+    window.history.replaceState(
+      null,
+      "",
+      withBase(
+        `/blog?${new URLSearchParams({ q: query, tag: activeTag || "", year, series, page: String(page) })}`,
+      ),
+    );
+    if (
+      query === initialQuery &&
+      (activeTag || "") === initialTag &&
+      page === initialPage &&
+      year === initialYear &&
+      series === initialSeries
+    ) {
       setSearchResults(null);
       setTotal(initialTotal);
       setIsSearching(false);
@@ -31,88 +68,175 @@ export function TagFilter({ posts, tags, tagCounts, initialQuery, initialTag, in
     const controller = new AbortController();
     setIsSearching(true);
     const timer = setTimeout(async () => {
-        try {
-          const res = await fetch(withBase(`/api/posts/search?${new URLSearchParams({ q: query, tag: activeTag || "", page: String(page) })}`), { signal: controller.signal });
-          if (!res.ok) throw new Error(res.status === 429 ? "Too many searches. Please try again shortly." : "Search failed. Please try again.");
-          const data: PostSummary[] = await res.json();
-          if (!controller.signal.aborted) {
-            setSearchResults(data);
-            setTotal(Number(res.headers.get("X-Total-Count")) || 0);
-          }
-        } catch (error) {
-          if (!controller.signal.aborted) {
-            setSearchResults([]);
-            setSearchError(error instanceof Error ? error.message : "Search failed. Please try again.");
-          }
-        } finally {
-          if (!controller.signal.aborted) setIsSearching(false);
+      try {
+        const res = await fetch(
+          withBase(
+            `/api/posts/search?${new URLSearchParams({ q: query, tag: activeTag || "", year, series, page: String(page) })}`,
+          ),
+          { signal: controller.signal },
+        );
+        if (!res.ok)
+          throw new Error(
+            res.status === 429
+              ? "Too many searches. Please try again shortly."
+              : "Search failed. Please try again.",
+          );
+        const data: PostSummary[] = await res.json();
+        if (!controller.signal.aborted) {
+          setSearchResults(data);
+          setTotal(Number(res.headers.get("X-Total-Count")) || 0);
+          setPage(Number(res.headers.get("X-Page")) || 1);
         }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setSearchResults([]);
+          setSearchError(
+            error instanceof Error
+              ? error.message
+              : "Search failed. Please try again.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsSearching(false);
+      }
     }, 300);
 
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [searchQuery, activeTag, page, initialQuery, initialTag, initialPage, initialTotal]);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    searchQuery,
+    activeTag,
+    page,
+    year,
+    series,
+    initialYear,
+    initialSeries,
+    initialQuery,
+    initialTag,
+    initialPage,
+    initialTotal,
+  ]);
 
   const displayPosts = searchResults ?? posts;
-  const pageUrl = (number: number) => withBase(`/blog?${new URLSearchParams({ q: searchQuery.trim(), tag: activeTag || "", page: String(number) })}`);
+  const pageUrl = (number: number) =>
+    withBase(
+      `/blog?${new URLSearchParams({ q: searchQuery.trim(), tag: activeTag || "", year, series, page: String(number) })}`,
+    );
 
   return (
     <div>
-      <form action={withBase("/blog")} method="get" onSubmit={e => e.preventDefault()}>
-      {activeTag && <input type="hidden" name="tag" value={activeTag} />}
-      <input
-        name="q"
-        type="text"
-        placeholder="Search posts..."
-        aria-label="Search posts"
-        maxLength={200}
-        value={searchQuery}
-        onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-        className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 mb-6"
-      />
+      <form
+        action={withBase("/blog")}
+        method="get"
+        onSubmit={(e) => e.preventDefault()}
+      >
+        {activeTag && <input type="hidden" name="tag" value={activeTag} />}
+        <input
+          name="q"
+          type="text"
+          placeholder="Search posts..."
+          aria-label="Search posts"
+          maxLength={200}
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setPage(1);
+          }}
+          className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 mb-6"
+        />
       </form>
-
-        <div className="flex flex-wrap gap-2 mb-8">
-          <button
-            onClick={() => { setActiveTag(null); setPage(1); }}
-            aria-pressed={activeTag === null}
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold transition-colors ${
-              activeTag === null
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-accent"
-            }`}
+      <div className="mb-5 flex flex-wrap gap-3">
+        <label className="text-sm">
+          Year{" "}
+          <select
+            className="rounded border bg-background p-2"
+            value={year}
+            onChange={(e) => {
+              setYear(e.target.value);
+              setPage(1);
+            }}
           >
-            All
-          </button>
-          {tags.map((tag) => {
-            const count = tagCounts[tag] || 0;
-            let sizeClass = "text-sm";
-            if (count <= 2) sizeClass = "text-xs";
-            else if (count >= 6) sizeClass = "text-sm font-semibold";
+            <option value="">All years</option>
+            {years.map((value) => (
+              <option key={value}>{value}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm">
+          Series{" "}
+          <select
+            className="rounded border bg-background p-2"
+            value={series}
+            onChange={(e) => {
+              setSeries(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All series</option>
+            {seriesOptions.map((value) => (
+              <option key={value}>{value}</option>
+            ))}
+          </select>
+        </label>
+      </div>
 
-            return (
-              <button
-                key={tag}
-                onClick={() => { setActiveTag(tag === activeTag ? null : tag); setPage(1); }}
-                aria-pressed={activeTag === tag}
-                className={`inline-flex items-center rounded-full border px-3 py-1 transition-colors ${sizeClass} ${
-                  activeTag === tag
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-accent"
-                }`}
-              >
-                {tag} ({count})
-              </button>
-            );
-          })}
-        </div>
+      <div className="flex flex-wrap gap-2 mb-8">
+        <button
+          onClick={() => {
+            setActiveTag(null);
+            setPage(1);
+          }}
+          aria-pressed={activeTag === null}
+          className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold transition-colors ${
+            activeTag === null
+              ? "bg-primary text-primary-foreground"
+              : "hover:bg-accent"
+          }`}
+        >
+          All
+        </button>
+        {tags.map((tag) => {
+          const count = tagCounts[tag] || 0;
+          let sizeClass = "text-sm";
+          if (count <= 2) sizeClass = "text-xs";
+          else if (count >= 6) sizeClass = "text-sm font-semibold";
 
-      {searchError && <p role="alert" className="text-destructive mb-4">{searchError}</p>}
+          return (
+            <button
+              key={tag}
+              onClick={() => {
+                setActiveTag(tag === activeTag ? null : tag);
+                setPage(1);
+              }}
+              aria-pressed={activeTag === tag}
+              className={`inline-flex items-center rounded-full border px-3 py-1 transition-colors ${sizeClass} ${
+                activeTag === tag
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-accent"
+              }`}
+            >
+              {tag} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {searchError && (
+        <p role="alert" className="text-destructive mb-4">
+          {searchError}
+        </p>
+      )}
 
       <div className="flex flex-col gap-4">
         {isSearching ? (
           <div className="flex flex-col gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-lg border overflow-hidden transition-colors">
+              <div
+                key={i}
+                className="rounded-lg border overflow-hidden transition-colors"
+              >
                 <div className="h-32 w-full bg-muted animate-pulse border-b border-border" />
                 <div className="p-4 flex flex-col gap-3">
                   <div className="h-5 w-3/4 rounded bg-muted animate-pulse" />
@@ -148,14 +272,21 @@ export function TagFilter({ posts, tags, tagCounts, initialQuery, initialTag, in
                     />
                   )}
                   <div className="p-4 flex flex-col gap-2">
-                    <h3 className="font-semibold">{post.title}</h3>
+                    <h3 className="font-semibold">
+                      <Highlight text={post.title} query={searchQuery} />
+                    </h3>
                     <p className="text-sm text-muted-foreground line-clamp-2">
-                      {post.description}
+                      <Highlight
+                        text={post.excerpt || post.description}
+                        query={searchQuery}
+                      />
                     </p>
                     <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
                         <time dateTime={post.publishedAt}>
-                          {new Date(post.publishedAt).toLocaleDateString("en-US")}
+                          {new Date(post.publishedAt).toLocaleDateString(
+                            "en-US",
+                          )}
                         </time>
                         <span>·</span>
                         <span>{post.readingTime} min read</span>
@@ -178,17 +309,42 @@ export function TagFilter({ posts, tags, tagCounts, initialQuery, initialTag, in
 
             {displayPosts.length === 0 && !searchError && (
               <p className="text-muted-foreground text-center py-8">
-                {searchResults !== null ? "No matching posts found" : "No posts yet"}
+                {searchResults !== null ||
+                searchQuery ||
+                year ||
+                series ||
+                activeTag
+                  ? "No matching posts found. Try a shorter keyword or clear the filters."
+                  : "No posts yet"}
               </p>
             )}
           </>
         )}
       </div>
-      {!isSearching && !searchError && total > 20 && <nav aria-label="Blog pages" className="flex items-center justify-between mt-8">
-        {page > 1 ? <a href={pageUrl(page - 1)} rel="prev">← Previous</a> : <span />}
-        <span>Page {page} of {Math.ceil(total / 20)}</span>
-        {page < Math.ceil(total / 20) ? <a href={pageUrl(page + 1)} rel="next">Next →</a> : <span />}
-      </nav>}
+      {!isSearching && !searchError && total > 20 && (
+        <nav
+          aria-label="Blog pages"
+          className="flex items-center justify-between mt-8"
+        >
+          {page > 1 ? (
+            <a href={pageUrl(page - 1)} rel="prev">
+              ← Previous
+            </a>
+          ) : (
+            <span />
+          )}
+          <span>
+            Page {page} of {Math.ceil(total / 20)}
+          </span>
+          {page < Math.ceil(total / 20) ? (
+            <a href={pageUrl(page + 1)} rel="next">
+              Next →
+            </a>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )}
     </div>
   );
 }

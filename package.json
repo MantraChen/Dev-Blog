@@ -33,13 +33,15 @@
     "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dompurify": "3.4.17",
     "drizzle-orm": "^0.45.1",
+    "fflate": "0.8.3",
     "highlight.js": "^11.11.1",
     "katex": "^0.18.2",
     "lucide-react": "^0.469.0",
     "marked": "^17.0.5",
-    "marked-highlight": "^2.2.3",
     "marked-katex-extension": "^5.1.13",
+    "mermaid": "12.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "sanitize-html": "^2.18.1",
@@ -47,6 +49,8 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.0.0",
     "tailwindcss": "^4.0.0",
+    "yaml": "2.9.1",
+    "yauzl": "3.4.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -55,6 +59,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.13",
     "@types/sanitize-html": "^2.16.2",
+    "@types/yauzl": "3.4.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   },

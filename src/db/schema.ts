@@ -1,9 +1,18 @@
-import { sqliteTable, text, int, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  int,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 // ─── Projects ────────────────────────────────────────────────────────
 export const projects = sqliteTable("projects", {
   id: int().primaryKey({ autoIncrement: true }),
+  slug: text().unique(),
+  content: text().notNull().default(""),
+  completedAt: text(),
   name: text().notNull(),
   description: text().notNull(),
   techStack: text({ mode: "json" }).notNull().$type<string[]>(),
@@ -53,43 +62,64 @@ export const timeline = sqliteTable("timeline", {
 });
 
 // ─── Post Views ─────────────────────────────────────────────────────
-export const postViews = sqliteTable("post_views", {
-  id: int().primaryKey({ autoIncrement: true }),
-  postId: int().references(() => posts.id, { onDelete: "cascade" }),
-  visitorKey: text(),
-  viewBucket: int(),
-  slug: text().notNull(),
-  createdAt: text()
-    .notNull()
-    .default(sql`(datetime('now'))`),
-}, (table) => [
-  uniqueIndex("post_views_visitor_bucket").on(table.postId, table.visitorKey, table.viewBucket),
-  index("post_views_post_created").on(table.postId, table.createdAt),
-  index("post_views_created").on(table.createdAt),
-]);
+export const postViews = sqliteTable(
+  "post_views",
+  {
+    id: int().primaryKey({ autoIncrement: true }),
+    postId: int().references(() => posts.id, { onDelete: "cascade" }),
+    visitorKey: text(),
+    viewBucket: int(),
+    slug: text().notNull(),
+    createdAt: text()
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    uniqueIndex("post_views_visitor_bucket").on(
+      table.postId,
+      table.visitorKey,
+      table.viewBucket,
+    ),
+    index("post_views_post_created").on(table.postId, table.createdAt),
+    index("post_views_created").on(table.createdAt),
+  ],
+);
 
 // ─── Posts ───────────────────────────────────────────────────────────
-export const posts = sqliteTable("posts", {
-  id: int().primaryKey({ autoIncrement: true }),
-  version: int().notNull().default(1),
-  title: text().notNull(),
-  slug: text().notNull().unique(),
-  description: text().notNull().default(""),
-  coverImage: text(),
-  content: text().notNull().default(""),
-  tags: text({ mode: "json" }).notNull().$type<string[]>().default([]),
-  featured: int({ mode: "boolean" }).notNull().default(false),
-  series: text(),
-  draft: int({ mode: "boolean" }).notNull().default(true),
-  hidden: int({ mode: "boolean" }).notNull().default(false),
-  publishedAt: text()
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text(),
-  createdAt: text()
-    .notNull()
-    .default(sql`(datetime('now'))`),
-}, (table) => [index("posts_public_date").on(table.draft, table.hidden, table.publishedAt, table.id)]);
+export const posts = sqliteTable(
+  "posts",
+  {
+    id: int().primaryKey({ autoIncrement: true }),
+    deletedAt: text(),
+    seriesOrder: int().notNull().default(0),
+    version: int().notNull().default(1),
+    title: text().notNull(),
+    slug: text().notNull().unique(),
+    description: text().notNull().default(""),
+    coverImage: text(),
+    content: text().notNull().default(""),
+    tags: text({ mode: "json" }).notNull().$type<string[]>().default([]),
+    featured: int({ mode: "boolean" }).notNull().default(false),
+    series: text(),
+    draft: int({ mode: "boolean" }).notNull().default(true),
+    hidden: int({ mode: "boolean" }).notNull().default(false),
+    publishedAt: text()
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    updatedAt: text(),
+    createdAt: text()
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    index("posts_public_date").on(
+      table.draft,
+      table.hidden,
+      table.publishedAt,
+      table.id,
+    ),
+  ],
+);
 
 // ─── Friends (Blogroll) ──────────────────────────────────────────────
 export const friends = sqliteTable("friends", {
@@ -105,18 +135,28 @@ export const friends = sqliteTable("friends", {
 });
 
 // ─── Reactions ──────────────────────────────────────────────────────
-export const reactions = sqliteTable("reactions", {
-  id: int().primaryKey({ autoIncrement: true }),
-  postId: int().references(() => posts.id, { onDelete: "cascade" }),
-  visitorKey: text(),
-  slug: text().notNull(),
-  emoji: text().notNull(), // 👍 🎉 ❤️ 🚀 👀 🤔
-  createdAt: text()
-    .notNull()
-    .default(sql`(datetime('now'))`),
-}, (table) => [index("reactions_post_emoji").on(table.postId, table.emoji),
-  uniqueIndex("reactions_visitor").on(table.postId, table.emoji, table.visitorKey),
-  index("reactions_created").on(table.createdAt)]);
+export const reactions = sqliteTable(
+  "reactions",
+  {
+    id: int().primaryKey({ autoIncrement: true }),
+    postId: int().references(() => posts.id, { onDelete: "cascade" }),
+    visitorKey: text(),
+    slug: text().notNull(),
+    emoji: text().notNull(), // 👍 🎉 ❤️ 🚀 👀 🤔
+    createdAt: text()
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    index("reactions_post_emoji").on(table.postId, table.emoji),
+    uniqueIndex("reactions_visitor").on(
+      table.postId,
+      table.emoji,
+      table.visitorKey,
+    ),
+    index("reactions_created").on(table.createdAt),
+  ],
+);
 
 // ─── Admin Sessions ──────────────────────────────────────────────────
 export const adminSessions = sqliteTable("admin_sessions", {

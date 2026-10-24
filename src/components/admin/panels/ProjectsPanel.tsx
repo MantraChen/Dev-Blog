@@ -10,35 +10,50 @@ export function ProjectsPanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(withBase("/api/projects"));
+      const res = await fetch(withBase("/api/projects?details=1"));
       if (res.ok) setItems(await res.json());
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const save = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const body = {
+      slug: (fd.get("slug") as string) || undefined,
+      content: fd.get("content") as string,
+      completedAt: (fd.get("completedAt") as string) || null,
       name: fd.get("name") as string,
       description: fd.get("description") as string,
-      techStack: (fd.get("techStack") as string).split(",").map((s) => s.trim()).filter(Boolean),
+      techStack: (fd.get("techStack") as string)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
       demoUrl: (fd.get("demoUrl") as string) || null,
       repoUrl: (fd.get("repoUrl") as string) || null,
       sortOrder: Number(fd.get("sortOrder")) || 0,
     };
 
     try {
-      const res = await fetch(withBase(editing ? `/api/projects/${editing.id}` : "/api/projects"), {
-        method: editing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(
+        withBase(editing ? `/api/projects/${editing.id}` : "/api/projects"),
+        {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
       if (!res.ok) throw new Error();
-      toast.success(editing ? "Project updated successfully" : "Project created successfully");
+      toast.success(
+        editing
+          ? "Project updated successfully"
+          : "Project created successfully",
+      );
       setEditing(null);
       setShowForm(false);
       load();
@@ -50,7 +65,9 @@ export function ProjectsPanel() {
   const remove = async (id: number) => {
     if (!confirm("Delete this project?")) return;
     try {
-      const res = await fetch(withBase(`/api/projects/${id}`), { method: "DELETE" });
+      const res = await fetch(withBase(`/api/projects/${id}`), {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error();
       toast.success("Project deleted");
       load();
@@ -64,7 +81,10 @@ export function ProjectsPanel() {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Projects</h2>
         <button
-          onClick={() => { setEditing(null); setShowForm(!showForm); }}
+          onClick={() => {
+            setEditing(null);
+            setShowForm(!showForm);
+          }}
           className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
         >
           {showForm ? "Cancel" : "Add Project"}
@@ -73,13 +93,79 @@ export function ProjectsPanel() {
 
       {showForm && (
         <form onSubmit={save} className="border rounded-lg p-4 mb-6 space-y-3">
-          <input name="name" placeholder="Name" defaultValue={editing?.name || ""} required className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm" />
-          <textarea name="description" placeholder="Description" defaultValue={editing?.description || ""} required className="flex min-h-[80px] w-full rounded-md border bg-transparent px-3 py-2 text-sm" />
-          <input name="techStack" placeholder="Tech stack (comma separated)" defaultValue={editing?.techStack?.join(", ") || ""} className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm" />
-          <input name="demoUrl" placeholder="Demo URL" defaultValue={editing?.demoUrl || ""} className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm" />
-          <input name="repoUrl" placeholder="Repo URL" defaultValue={editing?.repoUrl || ""} className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm" />
-          <input name="sortOrder" type="number" placeholder="Sort order" defaultValue={editing?.sortOrder || 0} className="flex h-9 w-32 rounded-md border bg-transparent px-3 text-sm" />
-          <button type="submit" className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
+          <input
+            name="name"
+            placeholder="Name"
+            defaultValue={editing?.name || ""}
+            required
+            className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+          />
+          <label className="block text-sm">
+            Project address
+            <input
+              name="slug"
+              placeholder="project-name (generated when empty)"
+              pattern="[a-z0-9]+(-[a-z0-9]+)*"
+              maxLength={100}
+              defaultValue={editing?.slug || ""}
+              className="w-full rounded border bg-transparent p-2"
+            />
+          </label>
+          <label className="block text-sm">
+            Completed date
+            <input
+              name="completedAt"
+              type="date"
+              defaultValue={editing?.completedAt || ""}
+              className="ml-3 rounded border bg-transparent p-2"
+            />
+          </label>
+          <label className="block text-sm">
+            Project retrospective (Markdown)
+            <textarea
+              name="content"
+              maxLength={500000}
+              placeholder="## Background\n## Architecture\n## Decisions\n## Lessons learned\n## Demo"
+              defaultValue={editing?.content || ""}
+              className="min-h-64 w-full rounded border bg-transparent p-3 font-mono"
+            />
+          </label>
+          <textarea
+            name="description"
+            placeholder="Description"
+            defaultValue={editing?.description || ""}
+            required
+            className="flex min-h-[80px] w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+          />
+          <input
+            name="techStack"
+            placeholder="Tech stack (comma separated)"
+            defaultValue={editing?.techStack?.join(", ") || ""}
+            className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+          />
+          <input
+            name="demoUrl"
+            placeholder="Demo URL"
+            defaultValue={editing?.demoUrl || ""}
+            className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+          />
+          <input
+            name="repoUrl"
+            placeholder="Repo URL"
+            defaultValue={editing?.repoUrl || ""}
+            className="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+          />
+          <input
+            name="sortOrder"
+            type="number"
+            placeholder="Sort order"
+            defaultValue={editing?.sortOrder || 0}
+            className="flex h-9 w-32 rounded-md border bg-transparent px-3 text-sm"
+          />
+          <button
+            type="submit"
+            className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+          >
             {editing ? "Update" : "Create"}
           </button>
         </form>
@@ -108,10 +194,25 @@ export function ProjectsPanel() {
             {items.map((p) => (
               <tr key={p.id} className="border-b">
                 <td className="py-2 font-medium">{p.name}</td>
-                <td className="py-2 text-muted-foreground truncate max-w-[200px]">{p.description}</td>
+                <td className="py-2 text-muted-foreground truncate max-w-[200px]">
+                  {p.description}
+                </td>
                 <td className="py-2 text-right space-x-2">
-                  <button onClick={() => { setEditing(p); setShowForm(true); }} className="text-xs px-2 py-1 rounded border hover:bg-accent">Edit</button>
-                  <button onClick={() => remove(p.id)} className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10">Delete</button>
+                  <button
+                    onClick={() => {
+                      setEditing(p);
+                      setShowForm(true);
+                    }}
+                    className="text-xs px-2 py-1 rounded border hover:bg-accent"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => remove(p.id)}
+                    className="text-xs px-2 py-1 rounded border text-destructive hover:bg-destructive/10"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

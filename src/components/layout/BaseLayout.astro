@@ -4,6 +4,7 @@ import "@/styles/globals.css"
 import "katex/dist/katex.min.css"
 import "@fontsource-variable/geist"
 import Nav from "./Nav.astro"
+import { QuickSearch } from '@/components/blog/QuickSearch';
 
 interface Props {
   title: string;
@@ -66,11 +67,12 @@ if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Ca
       <slot />
     </main>
     <footer class="border-t py-6 text-center text-sm text-muted-foreground">
-      <div class="container mx-auto max-w-6xl px-4 flex justify-between items-center">
+      <div class="container mx-auto max-w-6xl px-4 flex flex-wrap gap-4 justify-between items-center">
         <p>&copy;
           {new Date().getFullYear()} Howie Sun. Content licensed under CC BY-NC 4.0.</p>
         <a href={withBase("/admin")} class="hover:text-foreground transition-colors">Std::abort()</a>
       </div>
+      <div class="mx-auto mt-4 flex max-w-6xl flex-wrap items-center justify-center gap-5 px-4 text-sm"><a href={withBase('/series')}>Series</a><a href={withBase('/now')}>Now</a><a href={withBase('/review')}>Year in review</a><a href={withBase('/bookmarks')}>My bookmarks</a>{!Astro.url.pathname.startsWith(withBase('/admin'))&&<QuickSearch client:idle/>}</div>
     </footer>
 
     <button
@@ -82,5 +84,6 @@ if (!Astro.response.headers.has("Cache-Control")) Astro.response.headers.set("Ca
     </button>
 
     <script>import "@/scripts/layout";</script>
+    <script>import '@/scripts/content-enhancements';</script>
   </body>
 </html>

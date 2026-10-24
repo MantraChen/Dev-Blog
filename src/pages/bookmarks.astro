@@ -1,0 +1,5 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { Bookmarks } from '@/components/blog/Bookmarks';
+---
+<BaseLayout title="My bookmarks" noIndex><div class="mx-auto max-w-3xl space-y-6 py-8"><h1 class="text-3xl font-bold">My bookmarks</h1><p class="text-muted-foreground">Saved only in this browser. Clearing site data removes your bookmarks and reading positions.</p><Bookmarks client:load/></div></BaseLayout>

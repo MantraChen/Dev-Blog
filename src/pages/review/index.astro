@@ -1,0 +1,8 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { sqlite } from '@/db';
+import { withBase } from '@/lib/site-path';
+const years=sqlite.prepare("SELECT DISTINCT substr(publishedAt,1,4) AS year FROM posts WHERE draft=0 AND hidden=0 AND deletedAt IS NULL UNION SELECT DISTINCT substr(completedAt,1,4) FROM projects WHERE completedAt IS NOT NULL ORDER BY year DESC").all() as {year:string}[];
+const valid=years.filter(item=>/^\d{4}$/.test(item.year));
+---
+<BaseLayout title="Year in review | Howie Sun"><div class="mx-auto max-w-3xl space-y-6 py-8"><h1 class="text-3xl font-bold">Year in review</h1><p class="text-muted-foreground">Articles, completed projects and topics explored each year.</p><div class="grid grid-cols-2 gap-4 sm:grid-cols-3">{valid.map(({year})=><a class="rounded-xl border p-6 text-2xl font-semibold hover:bg-accent" href={withBase(`/review/${year}`)}>{year} →</a>)}</div>{valid.length===0&&<p>Publish an article or complete a project to start a yearly review.</p>}</div></BaseLayout>

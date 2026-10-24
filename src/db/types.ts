@@ -40,6 +40,9 @@ export type NewAuditLog = typeof auditLogs.$inferInsert;
 // ─── Frontend data contracts ────────────────────────────────────────
 export interface ProjectItem {
   id: number;
+  slug: string | null;
+  content: string;
+  completedAt: string | null;
   name: string;
   description: string;
   techStack: string[];

@@ -5,14 +5,22 @@ import { getPostBySlug, getPostViewCount, getAdjacentPosts } from "@/db/queries"
 import { renderMarkdown } from "@/lib/markdown"
 import { estimateReadingTime } from "@/lib/utils"
 import { ReactionBar } from "@/components/blog/ReactionBar"
+import { ReaderTools } from '@/components/blog/ReaderTools';
+import { resolveAlias } from '@/db/aliases';
+import { seriesChapters,relatedPosts,backlinks } from '@/db/content';
 
 const { slug } = Astro.params
 
 const post = await getPostBySlug(slug!)
 
 if (!post || post.draft) {
-  return Astro.rewrite("/404")
+  const alias=resolveAlias(slug!);
+  if(alias) return new Response(null,{status:308,headers:{Location:withBase(`/blog/${alias.slug}`)+Astro.url.search,'Cache-Control':'no-store'}});
+  return Astro.rewrite(withBase("/404"))
 }
+const chapters=post.series?seriesChapters(post.series):[];
+const chapterIndex=chapters.findIndex(item=>item.id===post.id);
+const related=post.hidden?[]:relatedPosts(post.id), references=post.hidden?[]:backlinks(post.id,post.slug);
 
 // 记录浏览量并获取计数和前后文章
 const viewCount = await getPostViewCount(slug!)
@@ -100,11 +108,14 @@ Astro.response.headers.set('Cache-Control', post.hidden ? 'private, no-store' : 
         )}
       </header>
 
-      <div class="prose prose-zinc dark:prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:rounded-lg prose-lead:leading-relaxed">
+      <ReaderTools id={post.id} slug={post.slug} title={post.title} client:load />
+      {chapters.length>0&&<details class="mb-6 rounded border p-4"><summary class="cursor-pointer text-sm font-medium">Series reading path · {chapterIndex>=0?`Chapter ${chapterIndex+1} of ${chapters.length}`:''}</summary><a class="my-3 block text-sm underline" href={withBase(`/series/${encodeURIComponent(post.series!)}`)}>Series introduction</a><ol class="space-y-2 text-sm">{chapters.map((chapter,index)=><li><a aria-current={chapter.id===post.id?'page':undefined} class={chapter.id===post.id?'font-bold':'underline'} href={withBase(`/blog/${chapter.slug}`)}>{index+1}. {chapter.title}</a></li>)}</ol><div class="mt-4 flex justify-between gap-3">{chapterIndex>0?<a class="text-sm underline" href={withBase(`/blog/${chapters[chapterIndex-1].slug}`)}>← Previous chapter</a>:<span/>}{chapterIndex>=0&&chapterIndex<chapters.length-1&&<a class="text-sm underline" href={withBase(`/blog/${chapters[chapterIndex+1].slug}`)}>Next chapter →</a>}</div></details>}
+      <div class="article-body prose prose-zinc dark:prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:rounded-lg prose-lead:leading-relaxed">
         <Fragment set:html={htmlContent} />
       </div>
 
       <ReactionBar slug={slug!} client:idle />
+      {(related.length>0||references.length>0)&&<div class="mt-8 grid gap-6 sm:grid-cols-2">{[["Related articles",related],["Referenced by",references]].map(([title,items])=><section><h2 class="mb-3 font-semibold">{title as string}</h2><ul class="space-y-2">{(items as {slug:string;title:string}[]).map(item=><li><a class="text-sm underline" href={withBase(`/blog/${item.slug}`)}>{item.title}</a></li>)}</ul></section>)}</div>}
 
       <nav class="mt-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-t border-border pt-6">
         {prev ? (

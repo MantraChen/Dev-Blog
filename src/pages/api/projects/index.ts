@@ -3,8 +3,11 @@ import { validateSession, getClientIp } from "@/lib/auth";
 import { getProjectList, createProject, createAuditLog } from "@/db/queries";
 import { createProjectSchema, safeParseBody } from "@/lib/validation";
 
-export const GET: APIRoute = async () => {
-  const projects = await getProjectList();
+export const GET: APIRoute = async ({ request, url }) => {
+  const details = url.searchParams.get("details") === "1";
+  if (details && !(await validateSession(request.headers.get("cookie"))))
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const projects = await getProjectList(details);
   return new Response(JSON.stringify(projects), {
     headers: { "Content-Type": "application/json" },
   });

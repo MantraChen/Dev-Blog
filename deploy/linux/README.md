@@ -17,3 +17,5 @@
 应用每 15 分钟有限批次清理过期统计明细。历史积压先 `npm run db:maintain` 查看，再 `npm run db:maintain -- --apply`；后者先创建并验证备份。配置 journald 限额和异机备份，并定期在隔离目录恢复演练。`npm run doctor` 是只读检查，不能替代这些演练。
 
 不要配置 `MemoryDenyWriteExecute=true`（可能阻止 V8 JIT），不要禁止线程创建（搜索使用 Node worker），不要把 SQLite 写目录设为只读。本模板不包含未经测试的自动 DNS 切换或数据库还原。
+
+迁移 008 后的内容平台使用单个应用进程：应用每 30 秒处理定时发布、过期回收站以及可选的每日备份。在线备份/恢复会排空进行中的 API 写入，并暂时拒绝新的写入。不要在同一个 SQLite / media 目录上并行运行多个应用进程执行这些维护操作。`MEDIA_DIR` 和 `FULL_BACKUP_DIR` 默认均位于数据库旁；自定义时同步调整 `ReadWritePaths`。详见 [内容平台与恢复说明](../../docs/CONTENT-PLATFORM.md)。

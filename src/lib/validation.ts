@@ -17,11 +17,22 @@ const httpUrl = z
     message: "URL must start with http:// or https://",
   });
 
-const imageUrl = z.union([httpUrl, z.string().regex(/^\/media\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/)]);
+const imageUrl = z.union([
+  httpUrl,
+  z
+    .string()
+    .regex(
+      /^\/media\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/,
+    ),
+]);
 
-const tags = z.array(z.string().trim().min(1).max(50)).max(20).transform(values => [...new Set(values)]);
-const publishedDate = z.union([z.iso.date(), z.iso.datetime({ offset: true })])
-  .transform(value => new Date(value).toISOString());
+const tags = z
+  .array(z.string().trim().min(1).max(50))
+  .max(20)
+  .transform((values) => [...new Set(values)]);
+const publishedDate = z
+  .union([z.iso.date(), z.iso.datetime({ offset: true })])
+  .transform((value) => new Date(value).toISOString());
 
 // ─── Posts ───────────────────────────────────────────────────────────
 
@@ -31,10 +42,14 @@ export const createPostSchema = z.object({
     .string()
     .min(1)
     .max(200)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Slug must be lowercase alphanumeric with hyphens",
+    ),
   description: z.string().max(500).default(""),
   coverImage: imageUrl.nullable().default(null),
   series: z.string().max(100).nullable().default(null),
+  seriesOrder: z.number().int().min(0).max(10000).default(0),
   content: z.string().max(500_000).default(""),
   tags: tags.default([]),
   featured: z.boolean().default(false),
@@ -43,27 +58,40 @@ export const createPostSchema = z.object({
   publishedAt: publishedDate.default(() => new Date().toISOString()),
 });
 
-export const updatePostSchema = z.object({
-  title: z.string().min(1).max(200),
-  slug: z
-    .string()
-    .min(1)
-    .max(200)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
-  description: z.string().max(500),
-  coverImage: imageUrl.nullable(),
-  series: z.string().max(100).nullable(),
-  content: z.string().max(500_000),
-  tags,
-  featured: z.boolean(),
-  draft: z.boolean(),
-  hidden: z.boolean(),
-  publishedAt: publishedDate,
-}).partial();
+export const updatePostSchema = z
+  .object({
+    title: z.string().min(1).max(200),
+    slug: z
+      .string()
+      .min(1)
+      .max(200)
+      .regex(
+        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+        "Slug must be lowercase alphanumeric with hyphens",
+      ),
+    description: z.string().max(500),
+    coverImage: imageUrl.nullable(),
+    series: z.string().max(100).nullable(),
+    seriesOrder: z.number().int().min(0).max(10000),
+    content: z.string().max(500_000),
+    tags,
+    featured: z.boolean(),
+    draft: z.boolean(),
+    hidden: z.boolean(),
+    publishedAt: publishedDate,
+  })
+  .partial();
 
 // ─── Projects ───────────────────────────────────────────────────────
 
 export const createProjectSchema = z.object({
+  slug: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .max(100)
+    .optional(),
+  content: z.string().max(500_000).default(""),
+  completedAt: z.iso.date().nullable().default(null),
   name: z.string().min(1).max(200),
   description: z.string().min(1).max(2000),
   techStack: z.array(z.string().max(50)).max(30).default([]),
@@ -72,12 +100,16 @@ export const createProjectSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateProjectSchema = createProjectSchema.extend({
-  techStack: createProjectSchema.shape.techStack.unwrap(),
-  demoUrl: createProjectSchema.shape.demoUrl.unwrap(),
-  repoUrl: createProjectSchema.shape.repoUrl.unwrap(),
-  sortOrder: createProjectSchema.shape.sortOrder.unwrap(),
-}).partial();
+export const updateProjectSchema = createProjectSchema
+  .extend({
+    content: createProjectSchema.shape.content.unwrap(),
+    completedAt: createProjectSchema.shape.completedAt.unwrap(),
+    techStack: createProjectSchema.shape.techStack.unwrap(),
+    demoUrl: createProjectSchema.shape.demoUrl.unwrap(),
+    repoUrl: createProjectSchema.shape.repoUrl.unwrap(),
+    sortOrder: createProjectSchema.shape.sortOrder.unwrap(),
+  })
+  .partial();
 
 // ─── Skills ─────────────────────────────────────────────────────────
 
@@ -89,11 +121,13 @@ export const createSkillSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateSkillSchema = createSkillSchema.extend({
-  level: createSkillSchema.shape.level.unwrap(),
-  iconSlug: createSkillSchema.shape.iconSlug.unwrap(),
-  sortOrder: createSkillSchema.shape.sortOrder.unwrap(),
-}).partial();
+export const updateSkillSchema = createSkillSchema
+  .extend({
+    level: createSkillSchema.shape.level.unwrap(),
+    iconSlug: createSkillSchema.shape.iconSlug.unwrap(),
+    sortOrder: createSkillSchema.shape.sortOrder.unwrap(),
+  })
+  .partial();
 
 // ─── Friends ────────────────────────────────────────────────────────
 
@@ -105,11 +139,13 @@ export const createFriendSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateFriendSchema = createFriendSchema.extend({
-  avatar: createFriendSchema.shape.avatar.unwrap(),
-  description: createFriendSchema.shape.description.unwrap(),
-  sortOrder: createFriendSchema.shape.sortOrder.unwrap(),
-}).partial();
+export const updateFriendSchema = createFriendSchema
+  .extend({
+    avatar: createFriendSchema.shape.avatar.unwrap(),
+    description: createFriendSchema.shape.description.unwrap(),
+    sortOrder: createFriendSchema.shape.sortOrder.unwrap(),
+  })
+  .partial();
 
 // ─── Statuses ───────────────────────────────────────────────────────
 
@@ -139,11 +175,13 @@ export const createTimelineSchema = z.object({
   sortOrder: z.number().int().min(0).max(10000).default(0),
 });
 
-export const updateTimelineSchema = createTimelineSchema.extend({
-  tags: createTimelineSchema.shape.tags.unwrap(),
-  url: createTimelineSchema.shape.url.unwrap(),
-  sortOrder: createTimelineSchema.shape.sortOrder.unwrap(),
-}).partial();
+export const updateTimelineSchema = createTimelineSchema
+  .extend({
+    tags: createTimelineSchema.shape.tags.unwrap(),
+    url: createTimelineSchema.shape.url.unwrap(),
+    sortOrder: createTimelineSchema.shape.sortOrder.unwrap(),
+  })
+  .partial();
 
 // ─── Reactions ──────────────────────────────────────────────────────
 
@@ -169,9 +207,21 @@ export const viewSchema = z.object({
 export async function safeParseBody<T>(
   request: Request,
   schema: z.ZodType<T>,
-): Promise<{ success: true; data: T } | { success: false; error: string; status: number }> {
-  if (request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() !== "application/json") {
-    return { success: false, error: "Content-Type must be application/json", status: 415 };
+): Promise<
+  { success: true; data: T } | { success: false; error: string; status: number }
+> {
+  if (
+    request.headers
+      .get("content-type")
+      ?.split(";", 1)[0]
+      .trim()
+      .toLowerCase() !== "application/json"
+  ) {
+    return {
+      success: false,
+      error: "Content-Type must be application/json",
+      status: 415,
+    };
   }
   const maxBytes = 1024 * 1024;
   if (Number(request.headers.get("content-length")) > maxBytes) {
@@ -180,7 +230,8 @@ export async function safeParseBody<T>(
   let raw: unknown;
   const reader = request.body?.getReader();
   try {
-    if (!reader) return { success: false, error: "JSON body required", status: 400 };
+    if (!reader)
+      return { success: false, error: "JSON body required", status: 400 };
     const chunks: Uint8Array[] = [];
     let bytes = 0;
     while (true) {
@@ -195,7 +246,10 @@ export async function safeParseBody<T>(
     }
     raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Body size limit exceeded:")) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Body size limit exceeded:")
+    ) {
       return { success: false, error: "Request body too large", status: 413 };
     }
     return { success: false, error: "Invalid JSON body", status: 400 };

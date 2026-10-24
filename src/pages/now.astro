@@ -1,0 +1,9 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { getNow } from '@/db/content';
+import { getLatestStatuses,getProjectList } from '@/db/queries';
+import { renderMarkdown } from '@/lib/markdown';
+import { withBase } from '@/lib/site-path';
+const now=getNow(),updates=await getLatestStatuses(5),projects=(await getProjectList()).filter(project=>!project.completedAt).slice(0,6);
+---
+<BaseLayout title="Now | Howie Sun" description="What I am doing, reading and learning"><div class="mx-auto max-w-3xl space-y-8 py-8"><header><h1 class="text-3xl font-bold">Now</h1><p class="mt-2 text-sm text-muted-foreground">Last updated {now.updatedAt.slice(0,10)}</p></header><div class="prose prose-zinc dark:prose-invert max-w-none"><Fragment set:html={renderMarkdown(now.content||'This page brings together my recent updates and current projects.')} /></div><section class="space-y-3"><h2 class="text-xl font-semibold">Recent updates</h2>{updates.map(update=><div class="rounded border p-4"><p>{update.text}</p><time class="text-xs text-muted-foreground">{update.createdAt.slice(0,10)}</time></div>)}{!updates.length&&<p>No recent updates yet.</p>}</section><section><h2 class="mb-3 text-xl font-semibold">Current projects</h2><ul class="space-y-3">{projects.map(project=><li><a class="underline" href={withBase(`/projects/${project.slug}`)}>{project.name}</a><p class="text-sm text-muted-foreground">{project.description}</p></li>)}</ul></section></div></BaseLayout>

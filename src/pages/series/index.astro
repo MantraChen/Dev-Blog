@@ -1,0 +1,7 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { seriesList } from '@/db/content';
+import { withBase } from '@/lib/site-path';
+const items=seriesList().filter(series=>series.count>0);
+---
+<BaseLayout title="Series | Howie Sun" description="Technical series and reading paths"><div class="mx-auto max-w-4xl space-y-8 py-8"><h1 class="text-3xl font-bold">Series & reading paths</h1><div class="grid gap-5 sm:grid-cols-2">{items.map(series=><a class="rounded-xl border p-6 hover:bg-accent" href={withBase(`/series/${encodeURIComponent(series.slug)}`)}><h2 class="text-xl font-semibold">{series.title}</h2><p class="mt-2 whitespace-pre-line text-sm text-muted-foreground">{series.description}</p><p class="mt-4 text-sm">{series.count} chapters →</p></a>)}</div>{items.length===0&&<p>No published series yet.</p>}</div></BaseLayout>

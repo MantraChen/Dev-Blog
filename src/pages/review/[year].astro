@@ -1,0 +1,10 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { yearReview } from '@/db/content';
+import { withBase } from '@/lib/site-path';
+const year=Astro.params.year||'';
+if(!/^\d{4}$/.test(year))return Astro.rewrite(withBase('/404'));
+const data=yearReview(year);
+if(!data.articles.length&&!data.projects.length)return Astro.rewrite(withBase('/404'));
+---
+<BaseLayout title={`${year} in review | Howie Sun`}><div class="mx-auto max-w-4xl space-y-8 py-8"><a class="underline text-sm" href={withBase('/review')}>← All years</a><h1 class="text-4xl font-bold">{year} in review</h1><div class="grid grid-cols-3 gap-3">{[[data.articles.length,'Articles'],[data.projects.length,'Projects completed'],[data.views,'Approximate views']].map(([value,label])=><div class="rounded-xl border p-4"><p class="text-3xl font-semibold">{value}</p><p class="text-xs text-muted-foreground">{label}</p></div>)}</div><section><h2 class="mb-3 text-xl font-semibold">Topics explored</h2><div class="flex flex-wrap gap-2">{data.topics.map(([tag,count])=><a class="rounded-full border px-3 py-1 text-sm" href={withBase(`/blog?${new URLSearchParams({tag,year})}`)}>{tag} · {count}</a>)}</div></section><section><h2 class="mb-3 text-xl font-semibold">Articles</h2><ul class="space-y-3">{data.articles.map(post=><li class="flex gap-4 border-b py-2"><time class="shrink-0 text-sm text-muted-foreground">{post.publishedAt.slice(5,10)}</time><a class="hover:underline" href={withBase(`/blog/${post.slug}`)}>{post.title}</a></li>)}</ul></section><section><h2 class="mb-3 text-xl font-semibold">Completed projects</h2><ul class="space-y-2">{data.projects.map(project=><li><a class="underline" href={withBase(`/projects/${project.slug}`)}>{project.name}</a> · {project.completedAt}</li>)}</ul></section></div></BaseLayout>

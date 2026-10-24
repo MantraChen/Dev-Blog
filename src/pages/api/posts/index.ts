@@ -8,7 +8,7 @@ const AUTH_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate, private",
 };
 
-export const GET: APIRoute = async ({ request }) => {
+export const GET: APIRoute = async ({ request, url }) => {
   if (!(await validateSession(request.headers.get("cookie")))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
@@ -16,7 +16,7 @@ export const GET: APIRoute = async ({ request }) => {
     });
   }
 
-  const posts = await getAllPosts();
+  const posts = await getAllPosts(url.searchParams.get("summary") === "1");
   return new Response(JSON.stringify(posts), {
     headers: AUTH_HEADERS,
   });

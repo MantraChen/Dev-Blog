@@ -1,0 +1,9 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { seriesList,seriesChapters } from '@/db/content';
+import { withBase } from '@/lib/site-path';
+const series=seriesList().find(item=>item.slug===Astro.params.slug&&item.count>0);
+if(!series)return Astro.rewrite(withBase('/404'));
+const chapters=seriesChapters(series.slug);
+---
+<BaseLayout title={`${series.title} | Series`} description={series.description}><div class="mx-auto max-w-3xl space-y-6 py-8"><a href={withBase('/series')} class="text-sm underline">← All series</a><h1 class="text-3xl font-bold">{series.title}</h1><p class="whitespace-pre-line text-muted-foreground">{series.description}</p><ol class="space-y-3">{chapters.map((post,index)=><li><a class="flex gap-4 rounded border p-4 hover:bg-accent" href={withBase(`/blog/${post.slug}`)}><span class="text-muted-foreground">{String(index+1).padStart(2,'0')}</span><span>{post.title}</span></a></li>)}</ol></div></BaseLayout>
