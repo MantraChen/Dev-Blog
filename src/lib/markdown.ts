@@ -18,7 +18,9 @@ function slugify(text: string): string {
 
 function createMarkdownParser() {
   const marked = new Marked();
-  const headingIds = new Set<string>();
+  const headingIds = new Set<string>(["reading-progress", "giscus-container", "toc-drawer", "toc-title",
+    "toc-close-btn", "mobile-toc-btn", "scroll-top", "mobile-menu-btn", "mobile-menu-panel",
+    "menu-icon-open", "menu-icon-close", "dynamic-favicon"]);
   // Custom renderer to add IDs to headings (for TOC)
   const renderer = new Renderer();
   renderer.heading = function ({ tokens, depth }) {

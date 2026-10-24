@@ -3,6 +3,13 @@ import assert from "node:assert/strict";
 import { renderMarkdown } from "../src/lib/markdown";
 import { slugifyPostTitle } from "../src/lib/post-slug";
 
+test("article headings cannot shadow page controls", () => {
+  const html = renderMarkdown("## toc-drawer\n\n## giscus-container\n\n## toc-drawer-1");
+  assert.doesNotMatch(html, /id="(?:toc-drawer|giscus-container)"/);
+  assert.match(html, /id="toc-drawer-1"/);
+  assert.match(html, /id="toc-drawer-1-1"/);
+});
+
 test("unknown languages and oversized code remain escaped and readable", () => {
   for (const lang of ["unknown", "javascript"]) {
     const body = '<script>alert("test")</script>\n'.repeat(1000);
