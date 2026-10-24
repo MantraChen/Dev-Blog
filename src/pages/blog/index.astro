@@ -2,7 +2,7 @@
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { TagFilter } from "@/components/blog/TagFilter"
 import { getPublishedPosts } from "@/db/queries"
-import { estimateReadingTime } from "@/lib/utils"
+import { toPostSummary } from "@/lib/post-summary"
 
 const posts = await getPublishedPosts()
 
@@ -14,15 +14,7 @@ posts.forEach(p => p.tags.forEach(t => {
   tagCounts[t] = (tagCounts[t] || 0) + 1
 }))
 
-const serializedPosts = posts.map((post) => ({
-  id: post.slug,
-  title: post.title,
-  description: post.description || "",
-  tags: post.tags,
-  publishedAt: post.publishedAt,
-  coverImage: post.coverImage,
-  readingTime: estimateReadingTime(post.content)
-}))
+const serializedPosts = posts.map(toPostSummary)
 ---
 
 <BaseLayout title="Blog | Tech Blog" description="Technical articles and notes">

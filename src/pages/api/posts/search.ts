@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { searchPosts } from "@/db/queries";
+import { toPostSummary } from "@/lib/post-summary";
 
 export const GET: APIRoute = async ({ url }) => {
   const query = url.searchParams.get("q")?.trim();
@@ -16,14 +17,7 @@ export const GET: APIRoute = async ({ url }) => {
 
   return new Response(
     JSON.stringify(
-      published.map(({ id, title, slug, description, tags, publishedAt }) => ({
-        id,
-        title,
-        slug,
-        description,
-        tags,
-        publishedAt,
-      })),
+      published.map(toPostSummary),
     ),
     {
       headers: {

@@ -1,18 +1,9 @@
 import React, { useState, useEffect } from "react";
 
-interface Post {
-  id: string;
-  slug?: string;
-  title: string;
-  description: string;
-  tags: string[];
-  publishedAt: string;
-  coverImage?: string | null;
-  readingTime: number;
-}
+import type { PostSummary } from "@/lib/post-summary";
 
 interface Props {
-  posts: Post[];
+  posts: PostSummary[];
   tags: string[];
   tagCounts: Record<string, number>;
 }
@@ -20,40 +11,41 @@ interface Props {
 export function TagFilter({ posts, tags, tagCounts }: Props) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Post[] | null>(null);
+  const [searchResults, setSearchResults] = useState<PostSummary[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
+    const query = searchQuery.trim();
+    setSearchError(null);
+    if (query.length < 2) {
+      setSearchResults(null);
+      setIsSearching(false);
+      return;
+    }
+    const controller = new AbortController();
+    setIsSearching(true);
     const timer = setTimeout(async () => {
-      if (searchQuery.trim().length >= 2) {
-        setIsSearching(true);
         try {
-          const res = await fetch(`/api/posts/search?q=${encodeURIComponent(searchQuery)}`);
-          if (res.ok) {
-            const data = await res.json();
-            setSearchResults(data);
-          } else {
-            setSearchResults([]);
-          }
+          const res = await fetch(`/api/posts/search?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+          if (!res.ok) throw new Error(res.status === 429 ? "Too many searches. Please try again shortly." : "Search failed. Please try again.");
+          const data: PostSummary[] = await res.json();
+          if (!controller.signal.aborted) setSearchResults(data);
         } catch (error) {
-          console.error("Failed to fetch search results:", error);
-          setSearchResults([]);
+          if (!controller.signal.aborted) {
+            setSearchResults([]);
+            setSearchError(error instanceof Error ? error.message : "Search failed. Please try again.");
+          }
         } finally {
-          setIsSearching(false);
+          if (!controller.signal.aborted) setIsSearching(false);
         }
-      } else {
-        setSearchResults(null);
-      }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [searchQuery]);
 
-  const filtered = activeTag
-    ? posts.filter((p) => p.tags.includes(activeTag))
-    : posts;
-
-  const displayPosts = searchResults !== null ? searchResults : filtered;
+  const candidates = searchResults ?? posts;
+  const displayPosts = activeTag ? candidates.filter((p) => p.tags.includes(activeTag)) : candidates;
 
   return (
     <div>
@@ -61,15 +53,16 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
         type="text"
         placeholder="Search posts..."
         aria-label="Search posts"
+        maxLength={200}
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 mb-6"
       />
 
-      {searchResults === null && (
         <div className="flex flex-wrap gap-2 mb-8">
           <button
             onClick={() => setActiveTag(null)}
+            aria-pressed={activeTag === null}
             className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold transition-colors ${
               activeTag === null
                 ? "bg-primary text-primary-foreground"
@@ -88,6 +81,7 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
               <button
                 key={tag}
                 onClick={() => setActiveTag(tag === activeTag ? null : tag)}
+                aria-pressed={activeTag === tag}
                 className={`inline-flex items-center rounded-full border px-3 py-1 transition-colors ${sizeClass} ${
                   activeTag === tag
                     ? "bg-primary text-primary-foreground"
@@ -99,7 +93,8 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
             );
           })}
         </div>
-      )}
+
+      {searchError && <p role="alert" className="text-destructive mb-4">{searchError}</p>}
 
       <div className="flex flex-col gap-4">
         {isSearching ? (
@@ -148,7 +143,7 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
                     <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
                         <time dateTime={post.publishedAt}>
-                          {new Date(post.publishedAt).toLocaleDateString()}
+                          {new Date(post.publishedAt).toLocaleDateString("en-US")}
                         </time>
                         <span>·</span>
                         <span>{post.readingTime} min read</span>
@@ -169,7 +164,7 @@ export function TagFilter({ posts, tags, tagCounts }: Props) {
               );
             })}
 
-            {displayPosts.length === 0 && (
+            {displayPosts.length === 0 && !searchError && (
               <p className="text-muted-foreground text-center py-8">
                 {searchResults !== null ? "No matching posts found" : "No posts yet"}
               </p>
