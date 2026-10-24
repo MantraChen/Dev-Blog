@@ -45,6 +45,11 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   assert.ok(ready, output);
+  for (const path of ["/", "/blog", "/archive", "/friends", "/projects", "/skills", "/timeline"]) {
+    const response = await get(path);
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers.get("cache-control"), "no-cache", path);
+  }
   for (const path of ["/blog/no-such-post", "/blog/draft", "/404"]) assert.equal((await get(path)).status, 404, path);
   const article = await get("/blog/public-1");
   assert.equal(article.status, 200);
