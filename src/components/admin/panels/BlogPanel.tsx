@@ -136,28 +136,24 @@ export function BlogPanel() {
     }
   };
 
-  // 通过服务端 API 进行精准 Markdown 解析
-  const renderPreview = useCallback(async () => {
-    try {
-      const res = await fetch("/api/posts/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-      if (!res.ok) throw new Error("Preview failed");
-      const { html } = await res.json();
-      setPreviewHtml(html);
-    } catch {
-      setPreviewHtml('<p class="text-destructive">Preview rendering failed</p>');
-    }
-  }, [content]);
-
-  // 使用 300ms 的防抖 (debounce) 来避免按键时频繁触发请求
   useEffect(() => {
     if (!preview) return;
-    const timer = setTimeout(() => renderPreview(), 300);
-    return () => clearTimeout(timer);
-  }, [preview, content, renderPreview]);
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/posts/preview", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content }), signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("Preview failed");
+        const { html } = await res.json();
+        if (!controller.signal.aborted) setPreviewHtml(html);
+      } catch {
+        if (!controller.signal.aborted) setPreviewHtml('<p class="text-destructive">Preview rendering failed</p>');
+      }
+    }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [preview, content]);
 
   return (
     <div>
