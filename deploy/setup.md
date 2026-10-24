@@ -9,10 +9,15 @@ Keep the database outside versioned releases. Before the first deployment, confi
 - `NODE_ENV=production`
 - `HOST=127.0.0.1`
 - `PORT=4321`
+- `SITE_URL=https://howielog.com`
+- `PUBLIC_BASE_PATH=/`
+- `WEBAUTHN_ORIGIN=https://howielog.com`
 - `DATABASE_PATH=C:\\sites\\dev-blog\\data.db` (use the actual existing database, an absolute path)
 - `ADMIN_PASSWORD_HASH=<bcrypt hash>` (runtime environment, never commit a password or hash)
 
 Use `nssm edit dev-blog` → Environment to avoid putting secrets in shell history. Restrict database, backup, release and log directory ACLs to the service/deployment accounts and administrators. The deployment account also needs the same Node major version as the blog, because SQLite uses a native addon.
+
+Use the same `SITE_URL` and `PUBLIC_BASE_PATH` in the deployment/webhook process that builds the release. Remove previous `dyyjs.com` / `/howielog` overrides before rebuilding; changing only the runtime environment cannot change already bundled URLs. The supplied Caddy example serves `howielog.com`. Domain changes require a fresh admin login and registering passkeys for the target domain. Existing remote backup tags also depend on site/base: retain the old snapshots and inspect the new backup target before enabling automatic retention.
 
 The application and webhook bind only to loopback. Only Caddy should accept internet traffic. Use [Caddyfile.example](Caddyfile.example), replace the domain, and update `security.allowedDomains` and `site` in `astro.config.mjs` if using a different hostname. Caddy replaces forwarded client headers; exposing the Node port directly would invalidate the IP rate-limit trust boundary.
 

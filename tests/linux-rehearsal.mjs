@@ -32,7 +32,7 @@ const root = await mkdtemp("/var/lib/devblog-rehearsal-"),
   name = "devblog-rehearsal-" + randomBytes(6).toString("hex"),
   appUnit = name + ".service",
   proxyUnit = name + "-proxy.service";
-const base = (process.env.PUBLIC_BASE_PATH || "/howielog").replace(/\/+$/, ""),
+const base = (process.env.PUBLIC_BASE_PATH || "/").replace(/\/+$/, ""),
   origin = "http://127.0.0.1:19642",
   password = randomBytes(24).toString("base64url");
 const unitPaths = [
@@ -94,7 +94,7 @@ try {
   const environment = join(root, "service.env");
   await writeFile(
     environment,
-    `NODE_ENV=production\nHOST=127.0.0.1\nPORT=19641\nDATABASE_PATH=${database}\nMEDIA_DIR=${join(state, "media")}\nADMIN_PASSWORD_HASH=${bcrypt.hashSync(password, 10)}\nSITE_URL=${process.env.SITE_URL || "https://dyyjs.com"}\nPUBLIC_BASE_PATH=${base}\n`,
+    `NODE_ENV=production\nHOST=127.0.0.1\nPORT=19641\nDATABASE_PATH=${database}\nMEDIA_DIR=${join(state, "media")}\nADMIN_PASSWORD_HASH=${bcrypt.hashSync(password, 10)}\nSITE_URL=${process.env.SITE_URL || "https://howielog.com"}\nPUBLIC_BASE_PATH=${base || "/"}\n`,
     { mode: 0o600 },
   );
   const template = await readFile("deploy/linux/dev-blog.service", "utf8");
@@ -191,7 +191,7 @@ try {
   assert.equal((await request("/blog/linux-rehearsal")).status, 200);
   assert.equal((await request("/blog/after-backup")).status, 404);
   console.log(
-    "PASS: Linux systemd sandbox, Caddy subpath proxy, automatic restart, persistent SQLite, complete backup and restoration.",
+    "PASS: Linux systemd sandbox, Caddy proxy, automatic restart, persistent SQLite, complete backup and restoration.",
   );
 } catch (error) {
   for (const unit of [appUnit, proxyUnit])

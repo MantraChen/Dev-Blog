@@ -2,7 +2,7 @@ import { defineMiddleware } from "astro:middleware";
 import { RateLimiter } from "./lib/rate-limit";
 import { sqlite } from "./db";
 import { getClientIp, isSameOriginMutation } from "./lib/request-security";
-import { BASE_PATH, withoutBase } from "./lib/site-path";
+import { BASE_PATH, withoutBase, withoutLegacyBase } from "./lib/site-path";
 import { HttpError } from "./lib/http-error";
 import { trackWrite } from "./lib/write-gate";
 import { startJobs } from "./lib/jobs";
@@ -41,6 +41,19 @@ export const onRequest = defineMiddleware(
       response = jsonError("Request body too large", 413);
     } else if (path.startsWith("/api/") && !isSameOriginMutation(request)) {
       response = jsonError("Cross-origin requests are not allowed", 403);
+    } else if (
+      !BASE_PATH &&
+      ["GET", "HEAD"].includes(request.method) &&
+      withoutLegacyBase(url.pathname) !== url.pathname
+    ) {
+      response = new Response(null, {
+        status: 308,
+        headers: {
+          Location: withoutLegacyBase(url.pathname) + url.search,
+          "Cache-Control": "private, no-store",
+          "X-Robots-Tag": "noindex, nofollow",
+        },
+      });
     } else {
       const rate =
         limitedPaths.has(path) ||
@@ -90,7 +103,7 @@ export const onRequest = defineMiddleware(
     response.headers.set("X-Frame-Options", "DENY");
     response.headers.set(
       "Referrer-Policy",
-      path.startsWith("/share")
+      path.startsWith("/share") || path.startsWith("/howielog/")
         ? "no-referrer"
         : "strict-origin-when-cross-origin",
     );

@@ -1,6 +1,6 @@
 # 写作、传播与运维增强
 
-本轮在 `feat/writing-workflow` 增加下面 10 项功能，并完善性能回归和 Linux 演练代码。数据库迁移为 `009-publishing-operations`。现有文章地址、SQLite 数据格式和 `/howielog` 部署前缀继续保留；朋友仓库 PR 保持关闭。
+下面 10 项功能已合入 `main`，并完善性能回归和 Linux 演练代码。数据库迁移为 `009-publishing-operations`。正式入口已恢复 `https://howielog.com/`；旧 `/howielog` 链接保持兼容，子路径部署只作为可选配置及回归测试。朋友仓库 PR 保持关闭。
 
 | 功能 | 使用方式 |
 | --- | --- |
@@ -67,6 +67,6 @@ Mermaid 进入视口附近才加载；超过 4,000 字符的图表需点击 Rend
 
 `npm run verify:all` 在本机运行类型检查、单元测试、规模回归、根路径和 `/howielog` 的构建与 HTTP 验收、依赖审计。`RESTIC_TEST_BINARY` 指向安装好的 restic 后，`npm run test:restic` 会建立临时加密仓库，执行上传、读取校验、保留预览、解密还原和应用恢复，不连接真实存储。
 
-CI 增加手动触发入口、Node 24.22.1 和规模回归。Linux 子路径任务安装 Caddy/restic/中文字体，并运行 `tests/linux-rehearsal.mjs`：在隔离目录和临时 systemd 单元验证权限限制、Caddy 反向代理、异常退出自动重启、数据持久化和完整恢复。脚本拒绝在非 GitHub-hosted runner 上运行，避免误操作生产服务。
+CI 增加手动触发入口、Node 24.22.1 和规模回归。Linux 根路径任务安装 Caddy/restic/中文字体，并运行 `tests/linux-rehearsal.mjs`：在隔离目录和临时 systemd 单元验证权限限制、Caddy 反向代理、异常退出自动重启、数据持久化和完整恢复。脚本拒绝在非 GitHub-hosted runner 上运行，避免误操作生产服务。
 
 当前用户没有可用 Linux 测试服务器及异机存储；本轮完成 Windows 本地验证和临时 restic 仓库演练。GitHub Actions 仍因账号账单锁定未启动，需要账号所有者解锁后重跑。Linux 脚本已做静态检查，**没有将其计为已运行通过**；真实 HTTPS、存储网络权限和设备通行密钥也须在目标环境验收。

@@ -22,7 +22,7 @@ for (let i = 1; i <= 25; i++)
   insert.run(
     `Public ${i}`,
     `public-${i}`,
-    "## 中文标题\n\nHello world\n\n[Related](https://howielog.com/blog/public-2?q=1#heading)\n\n![Legacy image](/icon-512.png)\n\n$$\\sqrt{x}$$",
+    "## 中文标题\n\nHello world\n\n[Related](https://howielog.com/blog/public-2?q=1#heading)\n\n[Shared origin](https://dyyjs.com/howielog/blog/public-2?q=1#heading)\n\n[Shared path](/howielog/blog/public-2?q=1#heading)\n\n![Legacy image](/howielog/icon-512.png)\n\n$$\\sqrt{x}$$",
     "Description",
     '["test"]',
     0,
@@ -70,6 +70,7 @@ const checkLocalLinks = (html) => {
       !base || url.startsWith(base + "/"),
       `URL escaped blog prefix: ${url}`,
     );
+    if (!base) assert.doesNotMatch(url, /^\/howielog(?:[/?#]|$)/);
   }
 };
 const password = crypto.randomUUID();
@@ -202,6 +203,31 @@ try {
       404,
     );
     assert.ok(html.includes('data-storage-key="howielog:theme"'));
+  } else {
+    assert.doesNotMatch(html, /https?:\/\/dyyjs\.com/);
+    for (const [oldPath, location] of [
+      ["/howielog", "/"],
+      ["/howielog/", "/"],
+      ["/howielog/blog/public-1?q=1", "/blog/public-1?q=1"],
+      ["/howielog/rss.xml?tag=test", "/rss.xml?tag=test"],
+      ["/howielog/admin/login", "/admin/login"],
+      ["/howielog//evil.example", "/evil.example"],
+    ]) {
+      const redirect = await get(oldPath);
+      assert.equal(redirect.status, 308, oldPath);
+      assert.equal(redirect.headers.get("location"), location);
+      assert.match(redirect.headers.get("cache-control"), /no-store/);
+    }
+    const legacyShare = await get("/howielog/share/private-token");
+    assert.equal(legacyShare.headers.get("referrer-policy"), "no-referrer");
+    assert.match(legacyShare.headers.get("x-robots-tag"), /noindex/);
+    assert.equal((await get("/howielogger/blog/public-1")).status, 404);
+    const oldMutation = await post("/howielog/api/posts", {});
+    assert.equal(
+      oldMutation.status,
+      404,
+      "Old mutation endpoints must not redirect or execute",
+    );
   }
   const robots = await (await get("/robots.txt")).text();
   assert.ok(robots.includes(`Disallow: ${base}/admin`));

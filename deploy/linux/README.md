@@ -1,6 +1,6 @@
 # Linux 试运行与切换
 
-接入 `HaruharaZhang/my_server` 的具体方案见 [服务器仓库适配说明](../my-server/README.md)，该方案通过朋友仓库的审核和组件部署入口运行。
+当前正式入口恢复为 `https://howielog.com/`。此前 `HaruharaZhang/my_server` 子路径方案见 [历史适配说明](../my-server/README.md)，不再作为默认部署入口。
 
 这是 Ubuntu LTS / systemd 的候选部署模板，尚未在本轮 Windows 机器实机运行。保留 Caddy、Node 和 SQLite；不自动替换线上 NSSM 服务。
 
@@ -20,6 +20,6 @@
 
 迁移 008 后的内容平台使用单个应用进程：应用每 30 秒处理定时发布、过期回收站以及可选的每日备份。在线备份/恢复会排空进行中的 API 写入，并暂时拒绝新的写入。不要在同一个 SQLite / media 目录上并行运行多个应用进程执行这些维护操作。`MEDIA_DIR` 和 `FULL_BACKUP_DIR` 默认均位于数据库旁；自定义时同步调整 `ReadWritePaths`。详见 [内容平台与恢复说明](../../docs/CONTENT-PLATFORM.md)。
 
-迁移 009 增加通行密钥、分享图和可选的 restic 备份。服务进程也需要 `SITE_URL`、`PUBLIC_BASE_PATH`，并按实际 HTTPS 来源设置 `WEBAUTHN_ORIGIN`。建议安装 `fonts-noto-cjk`；restic 缓存放在 `/var/lib/dev-blog/restic-cache`，凭据通过私密文件提供，不能依赖被 `ProtectHome=true` 屏蔽的管理员主目录。具体变量、保留策略及恢复方式见 [写作与运维增强](../../docs/PUBLISHING-OPERATIONS.md)。
+迁移 009 增加通行密钥、分享图和可选的 restic 备份。构建与服务进程统一设置 `SITE_URL=https://howielog.com`、`PUBLIC_BASE_PATH=/`，服务另设 `WEBAUTHN_ORIGIN=https://howielog.com`。移除旧共享域名环境覆盖后重新构建并重启；域名变化后重新登录、注册通行密钥，检查 restic 标签变化并保留旧备份。建议安装 `fonts-noto-cjk`；restic 缓存放在 `/var/lib/dev-blog/restic-cache`，凭据通过私密文件提供，不能依赖被 `ProtectHome=true` 屏蔽的管理员主目录。具体变量、保留策略及恢复方式见 [写作与运维增强](../../docs/PUBLISHING-OPERATIONS.md)。
 
-CI 的 Linux 子路径任务已配置独立 systemd/Caddy 演练，包括异常退出重启、持久目录和完整恢复；脚本限制在 GitHub-hosted runner，不能直接用于生产。当前本地无 Linux 测试机，Actions 因账号账单锁定未启动，此演练尚未运行通过。解锁后需重跑 CI，再在目标服务器做 HTTPS、备份后端网络权限和真实设备通行密钥验收。继续采用先试运行、再切换的方式，保留原有 Windows 服务作为可回退环境。
+CI 的 Linux 根路径任务已配置独立 systemd/Caddy 演练，包括异常退出重启、持久目录和完整恢复；脚本限制在 GitHub-hosted runner，不能直接用于生产。当前本地无 Linux 测试机，Actions 因账号账单锁定未启动，此演练尚未运行通过。解锁后需重跑 CI，再在目标服务器做 HTTPS、备份后端网络权限和真实设备通行密钥验收。继续采用先试运行、再切换的方式，保留原有 Windows 服务作为可回退环境。

@@ -74,7 +74,11 @@ See [the Windows deployment guide](deploy/setup.md) and [Caddy example](deploy/C
 
 See [the environment assessment](docs/ENVIRONMENT.md) for the minimal-risk Linux alternative, and [the systemd template](deploy/linux/README.md) for a staged trial.
 
-For the shared server, see [the my_server adapter](deploy/my-server/README.md). Build with `SITE_URL=https://dyyjs.com` and `PUBLIC_BASE_PATH=/howielog` to serve the complete blog at `https://dyyjs.com/howielog/`. Both settings are build-time values; changing them requires rebuilding. Omitting them preserves the standalone `https://howielog.com/` deployment. CI tests both layouts on Linux and Windows.
+The primary deployment is **https://howielog.com/**. Set `SITE_URL=https://howielog.com`, `PUBLIC_BASE_PATH=/` and `WEBAUTHN_ORIGIN=https://howielog.com` in the service environment; use the same site/base when building. Remove any previous shared-host overrides from the build runner and service, then rebuild and restart. Navigation, APIs, canonical/OG URLs, RSS, sitemap and subscriptions use the root domain.
+
+Old `/howielog/...` GET/HEAD requests on this blog redirect to the matching root path with their query string. Stored links and images using the old prefix or `https://dyyjs.com/howielog/` are normalized when rendered, preserving article slugs and content. Other paths on the friend's domain remain external. Redirecting requests that actually arrive at the friend's server requires that server's configuration; this repository cannot change it. The [my_server notes](deploy/my-server/README.md) retain that historical boundary.
+
+Subpath support remains a compatibility test. `npm run verify:all` tests it first and leaves `dist/` built for `https://howielog.com/` at completion. CI tests both layouts on Linux and Windows; the Linux service rehearsal targets the primary root deployment.
 
 Deployment builds a new release with `npm ci` and verifies it before stopping the running service. It backs up and migrates SQLite, switches NSSM, checks the exact release and restores the previous service configuration on failure. Old releases and backups are retained for recovery; monitor their disk usage.
 

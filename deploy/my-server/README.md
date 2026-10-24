@@ -1,17 +1,21 @@
-# 接入朋友的 my_server
+# my_server 适配历史与域名恢复
 
-服务器侧适配见 [HaruharaZhang/my_server PR #13](https://github.com/HaruharaZhang/my_server/pull/13)，该 PR 已按要求关闭，组件尚待重新评审。组件为 `z_my_server/dev-blog`，服务器仓库的 `source.json` 固定完整 commit，不自动跟随分支更新。本次写作和内容平台功能位于 `feat/writing-workflow`，尚未更新朋友仓库的源码版本，也未部署。
+当前正式入口已恢复为 **https://howielog.com/**，代码已合入 `main`。服务器侧 [HaruharaZhang/my_server PR #13](https://github.com/HaruharaZhang/my_server/pull/13) 保持关闭；本次没有修改朋友仓库的 `source.json`、重开 PR 或执行部署。
 
-目标入口为 **https://dyyjs.com/howielog/**：文章 `/howielog/blog/<slug>`、后台 `/howielog/admin`、接口 `/howielog/api/*`、RSS `/howielog/rss.xml`。访问 `/howielog` 时由 Caddy 以 308 补齐尾部斜杠并保留查询参数。博客由该路径直接提供服务，不再跳往 howielog.com；已有文章 slug、管理功能和 SQLite 数据保留。
+此前方案是在 `https://dyyjs.com/howielog/` 直接提供博客服务。该路径不再是默认入口；请勿把旧组件中的 `SITE_URL=https://dyyjs.com`、`PUBLIC_BASE_PATH=/howielog` 原样用于当前独立域名部署。
 
-构建时设置 `SITE_URL=https://dyyjs.com`、`PUBLIC_BASE_PATH=/howielog`，在相同环境中执行 `npm run verify`。部署器及 CI 从 source.json 读取这两个设置。资源、导航、API、canonical、OG、RSS/sitemap 均包含前缀；旧 howielog.com 内容链接在展示时转换，不改数据库正文。Giscus 按去掉部署前缀后的原 pathname 查找评论；若评论仓库设置过来源白名单，需要允许新域名并在上线前验证已有评论。
+## 当前配置
 
-后台与访客 Cookie 使用专属名称和 `/howielog/` Path，主题存储键改为 `howielog:theme`；迁移后需要重新登录。子路径并非浏览器同源安全隔离，共用域名的应用必须相互信任。共享根目录的 Service Worker、缓存和 robots.txt 规则由服务器所有者维护，博客不覆盖它们。
+构建和服务统一使用 `SITE_URL=https://howielog.com`、`PUBLIC_BASE_PATH=/`；服务设置 `WEBAUTHN_ORIGIN=https://howielog.com`。修改旧环境配置后重新构建并重启，不能只替换静态文件或只改运行时变量。部署步骤见 [Windows](../setup.md) 或 [Linux](../linux/README.md)，Caddy 示例已使用 `howielog.com`。
 
-服务器运行环境为 Linux / systemd / 现有 Caddy，专用 Node 24.22.1+、回环端口 4321、独立服务账户和持久 SQLite 目录。组件默认关闭，配置、数据库导入及启用步骤以服务器组件 README 为准。准备包含构建及 HTTP 验证、数据库副本迁移演练、一致备份、精确版本健康检查和失败恢复；代码回退不会覆盖数据库新写入。
+文章 `/blog/<slug>`、后台 `/admin`、接口 `/api/*`、图片 `/media/<uuid>.webp`、RSS `/rss.xml`、canonical/OG 和 sitemap 均使用根路径。博客收到旧 `/howielog/...` 的 GET/HEAD 请求会跳到相应根路径并保留查询参数；写入接口不重定向。正文、封面等已保存的博客链接在渲染时转换，数据库正文及文章 slug 不变；Giscus 继续按原始文章 pathname 查找讨论。
 
-写作和内容平台功能增加 `007-writing-workflow.sql`、`008-content-platform.sql` 迁移，以及持久图片目录。默认目录是数据库所在目录下的 `media`（例如 `/var/lib/dyyjs-devblog/media`），由博客服务账户读写，位于原有 systemd 可写目录内；自定义 `MEDIA_DIR` 时须同步核对服务沙箱权限。图片通过 `/howielog/media/<uuid>.webp` 的应用路由鉴权，Caddy 不应直接暴露磁盘目录。
+浏览器直接访问朋友域名的旧地址时，请求仍由朋友服务器接收；如需从那里跳转到 `howielog.com`，须由服务器所有者单独配置。此博客仓库无法代替对方修改 DNS、TLS 或 Caddy。对方域名的其他页面不会被当作博客链接替换。
 
-重新提交服务器 PR 前，需要把备份/恢复流程扩展为 **SQLite + media 文件目录**，目前原部署器的数据库备份不会自动包含上传图片。暂停写入后生成数据库一致备份，再复制完整图片目录并共同保管、演练恢复；回退代码时应保留图片文件。迁移 008 后可在后台创建、校验和恢复数据库与图片的成套备份；默认目录为 `${DATABASE_PATH}.full-backups`，可用 `FULL_BACKUP_DIR` 指定持久目录，须包含在 systemd 的可写范围内。在线维护要求单应用进程；每日备份默认关闭，手动启用后须监控容量并复制到异机。图片只允许在没有保存引用时手动删除。迁移前先做数据库副本演练，部署后验证草稿私密图片 404、发布后可访问、撤下文章后收回访问。近期版本历史每篇最多 30 份，未引用图片不自动删除，需监控磁盘空间。
+## 数据和认证
 
-Caddy 路由片段须导入现有 dyyjs.com 站点块，保留 `/howielog` 转发前缀及其他服务路由；robots 规则须合并到域名根目录文件。上线前完成 Linux CI、systemd 权限检查、数据恢复演练和 HTTPS/登录/搜索/评论验收，再在旧站暂停写入后同步最终数据。无需给 howielog.com 改 DNS；外部保存的旧域名链接只有在旧域名仍可提供 HTTP 服务时才能另外设置重定向。Windows 自动部署 webhook 保持暂停。
+保留现有 SQLite、media 和完整备份目录；迁移 007–009 及内容功能均保留，不能用空数据库覆盖。升级前成套备份数据库和图片，按 [内容平台说明](../../docs/CONTENT-PLATFORM.md) 校验恢复。
+
+独立域名使用根路径 Cookie，需要重新登录。通行密钥绑定域名，目标域名应重新注册；管理员密码仍为恢复入口。restic 站点标签依赖域名和前缀，旧标签备份继续保留，检查配置后再开启新标签下的自动备份与清理。
+
+`/howielog` 部署能力仍保留以验证兼容性；`npm run verify:all` 先测子路径，最后构建并验证 `howielog.com` 根路径，完成后的 `dist/` 对应正式入口。此前测试服务器资源和 GitHub 账单限制仍需在实际上线前解决。

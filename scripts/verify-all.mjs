@@ -23,8 +23,9 @@ const env = { ...process.env, ASTRO_TELEMETRY_DISABLED: "1" };
 for (const command of ["check", "test", "test:scale"])
   await run(["run", command], env);
 for (const [base, site] of [
+  // Run compatibility first so dist/ finishes with the primary domain build.
+  ["/howielog", "https://preview.example.com"],
   ["/", "https://howielog.com"],
-  ["/howielog", "https://dyyjs.com"],
 ]) {
   const config = { ...env, PUBLIC_BASE_PATH: base, SITE_URL: site };
   await run(["run", "build"], config);

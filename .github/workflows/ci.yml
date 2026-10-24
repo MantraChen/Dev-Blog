@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ASTRO_TELEMETRY_DISABLED: "1"
-      SITE_URL: ${{ matrix.deployment == 'subpath' && 'https://dyyjs.com' || 'https://howielog.com' }}
+      SITE_URL: ${{ matrix.deployment == 'subpath' && 'https://preview.example.com' || 'https://howielog.com' }}
       PUBLIC_BASE_PATH: ${{ matrix.deployment == 'subpath' && '/howielog' || '/' }}
     steps:
       - uses: actions/checkout@v4
@@ -33,15 +33,15 @@ jobs:
       - run: npm run test:http
       - run: npm audit --audit-level=moderate
       - name: Install rehearsal tools
-        if: runner.os == 'Linux' && matrix.deployment == 'subpath'
+        if: runner.os == 'Linux' && matrix.deployment == 'root'
         run: |
           sudo apt-get update
           sudo apt-get install -y caddy restic fonts-noto-cjk
       - name: Test encrypted backup round trip
-        if: runner.os == 'Linux' && matrix.deployment == 'subpath'
+        if: runner.os == 'Linux' && matrix.deployment == 'root'
         env:
           RESTIC_TEST_BINARY: /usr/bin/restic
         run: npm run test:restic
       - name: Rehearse Linux service, proxy and recovery
-        if: runner.os == 'Linux' && matrix.deployment == 'subpath'
+        if: runner.os == 'Linux' && matrix.deployment == 'root'
         run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT,SITE_URL,PUBLIC_BASE_PATH "$(command -v node)" tests/linux-rehearsal.mjs
