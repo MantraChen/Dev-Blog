@@ -1,70 +1,59 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const EMOJIS = ["👍", "🎉", "❤️", "🚀", "👀", "🤔"];
-
 export function ReactionBar({ slug }: { slug: string }) {
   const [reactions, setReactions] = useState<Record<string, number>>({});
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/reactions?slug=${slug}`);
-      if (res.ok) {
-        setReactions(await res.json());
-      }
-    } catch (e) {
-      console.error("Failed to load reactions", e);
-    }
+  const [pending, setPending] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const request = useRef<AbortController | null>(null);
+  const submitting = useRef(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    request.current = controller;
+    setPending(true);
+    setReactions({});
+    setError(null);
+    fetch(`/api/reactions?slug=${encodeURIComponent(slug)}`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Could not load reactions.");
+        const counts = await response.json();
+        if (!controller.signal.aborted) setReactions(counts);
+      })
+      .catch(() => { if (!controller.signal.aborted) setError("Could not load reactions."); })
+      .finally(() => { if (!controller.signal.aborted) setPending(false); });
+    return () => { controller.abort(); request.current?.abort(); };
   }, [slug]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
   const react = async (emoji: string) => {
-    // Optimistic UI update
-    setReactions((prev) => ({
-      ...prev,
-      [emoji]: (prev[emoji] || 0) + 1,
-    }));
-
+    if (pending || submitting.current) return;
+    submitting.current = true;
+    setPending(true);
+    setError(null);
+    const controller = new AbortController();
+    request.current = controller;
     try {
-      const res = await fetch("/api/reactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, emoji }),
+      const response = await fetch("/api/reactions", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, emoji }), signal: controller.signal,
       });
-
-      if (res.ok) {
-        // Sync with actual updated data from server
-        const updated = await res.json();
-        setReactions(updated);
-      } else {
-        // Revert on failure
-        load();
-      }
-    } catch (e) {
-      console.error("Failed to post reaction", e);
-      load();
+      if (!response.ok) throw new Error(response.status === 429 ? "Too many reactions. Please try again later." : "Reaction was not saved. Please try again.");
+      const counts = await response.json();
+      if (!controller.signal.aborted) setReactions(counts);
+    } catch (error) {
+      if (!controller.signal.aborted) setError(error instanceof Error ? error.message : "Could not save reaction.");
+    } finally {
+      submitting.current = false;
+      if (!controller.signal.aborted) setPending(false);
     }
   };
 
-  return (
-    <div className="flex flex-wrap gap-2 py-6 mt-8 border-t border-border">
-      {EMOJIS.map((emoji) => (
-        <button
-          key={emoji}
-          onClick={() => react(emoji)}
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-sm bg-background hover:bg-accent active:scale-95 transition-all"
-          aria-label={`React with ${emoji}`}
-        >
-          <span>{emoji}</span>
-          {(reactions[emoji] || 0) > 0 && (
-            <span className="text-muted-foreground font-medium text-xs">
-              {reactions[emoji]}
-            </span>
-          )}
-        </button>
-      ))}
-    </div>
-  );
+  return <div className="flex flex-wrap gap-2 py-6 mt-8 border-t border-border" aria-busy={pending}>
+    {EMOJIS.map(emoji => <button key={emoji} onClick={() => react(emoji)} disabled={pending}
+      className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-sm bg-background hover:bg-accent disabled:opacity-50"
+      aria-label={`React with ${emoji}`}>
+      <span>{emoji}</span>
+      {(reactions[emoji] || 0) > 0 && <span className="text-muted-foreground font-medium text-xs">{reactions[emoji]}</span>}
+    </button>)}
+    {error && <p role="alert" className="w-full text-sm text-destructive">{error}</p>}
+  </div>;
 }
