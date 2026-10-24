@@ -1,6 +1,7 @@
 import rss from "@astrojs/rss";
 import { getPublishedPostMetadata } from "@/db/queries";
 import type { APIContext } from "astro";
+import { feedDate } from "@/lib/feed-format";
 
 export async function GET(context: APIContext) {
   const posts = await getPublishedPostMetadata();
@@ -11,9 +12,9 @@ export async function GET(context: APIContext) {
     site: context.site!,
     items: posts.map((post) => ({
       title: post.title,
-      pubDate: new Date(post.publishedAt),
+      pubDate: feedDate(post.publishedAt) ? new Date(feedDate(post.publishedAt)!) : undefined,
       description: post.description || post.title,
-      link: `/blog/${post.slug}/`,
+      link: `/blog/${encodeURIComponent(post.slug)}`,
     })),
   });
   response.headers.set("Cache-Control", "no-cache");
