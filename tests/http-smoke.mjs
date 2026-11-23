@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { createHash } from "node:crypto";
 import Database from "better-sqlite3";
@@ -13,6 +13,11 @@ import { migrate } from "../scripts/migrate.mjs";
 
 const directory = mkdtempSync(join(tmpdir(), "devblog-http-test-"));
 const database = join(directory, "test.db");
+const securityDatabase = join(directory, "security.db");
+const python = process.env.PYTHON || (process.platform === "win32" ? "python" : "python3");
+execFileSync(python, ["tests/security-fixture.py", securityDatabase], {
+  stdio: "inherit",
+});
 const db = new Database(database);
 migrate(db);
 const insert = db.prepare(
@@ -80,6 +85,7 @@ const child = spawn(process.execPath, ["dist/server/entry.mjs"], {
     HOST: "127.0.0.1",
     PORT: String(port),
     DATABASE_PATH: database,
+    SECURITY_DATABASE_PATH: securityDatabase,
     MEDIA_DIR: join(directory, "media"),
     ADMIN_PASSWORD_HASH: bcrypt.hashSync(password, 4),
   },
@@ -142,6 +148,20 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(ready, output);
+  const security = await get("/security");
+  assert.equal(security.status, 200);
+  const securityPage = await security.text();
+  checkLocalLinks(securityPage);
+  assert.match(securityPage, /Synthetic advisory/);
+  const advisory = await get("/security/advisories/GHSA-2345-2345-2345");
+  assert.equal(advisory.status, 200);
+  assert.match(await advisory.text(), /https:\/\/github\.com\/advisories\/GHSA-2345-2345-2345/);
+  assert.equal((await get("/security/advisories/NO-SUCH-ADVISORY")).status, 404);
+  assert.equal((await get("/security?q=synthetic")).status, 200);
+  const securityFeed = await get("/security/rss.xml");
+  assert.equal(securityFeed.status, 200);
+  assert.match(await securityFeed.text(), /Synthetic advisory/);
+  assert.equal((await get("/security/response")).status, 200);
   for (const path of [
     "/",
     "/blog",
