@@ -38,15 +38,25 @@ class SecuritySyncTest(unittest.TestCase):
         self.put('GitHub',self.sample())
         sync.materialize(self.db)
         sync.state(self.db,'GitHub',last_success='2026-01-01T00:00:00Z',cursor='old')
+        self.db.commit()
         original=self.entry()
-        with patch.object(sync,'materialize',side_effect=sqlite3.OperationalError),self.assertRaises(sqlite3.OperationalError):
-            sync.sync_source(self.db,'GitHub',lambda:'next')
+        self.db.execute("""CREATE TRIGGER reject_entry BEFORE INSERT ON entries
+                         BEGIN SELECT RAISE(ABORT, 'fixture failure'); END""")
+        def change():
+            sync.put(self.db,'GitHub',dict(self.sample(),summary='Revised title'))
+            return 'next'
+        with self.assertRaises(sqlite3.IntegrityError):
+            sync.sync_source(self.db,'GitHub',change)
         fields='SELECT last_success,cursor,error FROM states WHERE source=?'
-        self.assertEqual(self.db.execute(fields,('GitHub',)).fetchone(),('2026-01-01T00:00:00Z','old','OperationalError'))
+        self.assertEqual(self.db.execute(fields,('GitHub',)).fetchone(),('2026-01-01T00:00:00Z','old','IntegrityError'))
         self.assertEqual(self.entry(),original)
+        self.assertEqual(json.loads(self.db.execute('SELECT body FROM records').fetchone()[0])['summary'],
+                         self.sample()['summary'])
+        self.db.execute('DROP TRIGGER reject_entry')
         with patch.object(sync,'now',return_value='2026-01-01T01:00:00Z'):
-            self.assertEqual(sync.sync_source(self.db,'GitHub',lambda:'next'),(1,1))
+            self.assertEqual(sync.sync_source(self.db,'GitHub',change),(1,1))
         self.assertEqual(self.db.execute(fields,('GitHub',)).fetchone(),('2026-01-01T01:00:00Z','next',None))
+        self.assertEqual(self.entry()['title'],'Revised title')
     def test_unsafe_reference_is_never_published_as_link(self):
         r=self.sample(references=[{'url':'javascript:alert(1)'},{'url':'https://example.com/patch'},{'url':'http://127.0.0.1'}])
         self.assertEqual(sync.normalized('GitHub',r)['references'],['https://example.com/patch'])
