@@ -24,7 +24,7 @@
     "test:restic": "node tests/restic-roundtrip.mjs"
   },
   "dependencies": {
-    "@astrojs/node": "^11.1.9",
+    "@astrojs/node": "^11.1.14",
     "@astrojs/react": "^7.1.1",
     "@astrojs/rss": "^4.0.19",
     "@fontsource-variable/geist": "5.3.0",
@@ -33,7 +33,7 @@
     "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "astro": "^7.4.2",
+    "astro": "^7.4.13",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
