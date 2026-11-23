@@ -68,6 +68,9 @@ health check so a feed delay can be handled independently of an outage.
 
 ## Verification
 
+`npm run test:http` uses Python 3 to publish a synthetic advisory before
+starting the local server. Set `PYTHON` when the interpreter is off PATH.
+
 `python3 -m unittest discover -s tests -p test_security_sync.py -v` checks alias merging, source withdrawals, idempotence, cursor safety and unsafe URLs. `node tests/security-http.mjs` checks live pages, search and filters, unknown advisory 404, HTML attribute escaping, RSS, response page and homepage. Set `SECURITY_TEST_ORIGIN` to the candidate's origin. Run `npm run check` and `npm run build` before container publication.
 
 GitHub data is CC BY 4.0; links and attribution are shown on the site. OSV retains upstream data-source licensing. All imported descriptions are rendered as text, never as executable HTML or instructions.
