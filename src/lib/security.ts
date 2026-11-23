@@ -18,6 +18,10 @@ export interface Advisory {
   published: string; modified: string; ecosystems: string[]; packages: string[];
 }
 export interface SourceState {source: string; last_attempt: string; last_success: string | null; error: string | null; count: number}
+type SyncHealth = 'ok' | 'stale' | 'unavailable';
+const expectedSources = ['GitHub', 'CISA KEV', 'OSV / npm', 'OSV / PyPI', 'OSV / Maven', 'OSV / crates.io', 'OSV / Go'];
+const maxSyncAge = 3 * 60 * 60 * 1000;
+const clockTolerance = 5000;
 export const severityLabels: Record<string,string> = {critical:'严重',high:'高危',medium:'中危',low:'低危',unknown:'未评级'};
 export const ecosystemOptions = ['npm','PyPI','Maven','crates.io','Go','Vendor'];
 const path = () => process.env.SECURITY_DATABASE_PATH || join(dirname(process.env.DATABASE_PATH || 'data.db'),'security.db');
@@ -32,6 +36,15 @@ export function securityStatus() {
     total:(db.prepare('SELECT count(*) n FROM entries').get() as {n:number}).n,
     exploited:(db.prepare('SELECT count(*) n FROM entries WHERE exploited=1 AND withdrawn=0').get() as {n:number}).n,
   }),{sources:[] as SourceState[],total:0,exploited:0});
+}
+export function securitySyncHealth(now = Date.now()): SyncHealth {
+  return read<SyncHealth>(db => {
+    const published = db.prepare('SELECT 1 FROM entries LIMIT 1').get();
+    if (!published) return 'unavailable';
+    const states = db.prepare('SELECT source,last_success FROM states').all() as Pick<SourceState, 'source' | 'last_success'>[];
+    const bySource = new Map(states.map(state => [state.source, state]));
+    return expectedSources.every(source => !sourceStale(bySource.get(source), now)) ? 'ok' : 'stale';
+  }, 'unavailable');
 }
 export function securityList(params: URLSearchParams, pageSize=24) {
   const q=(params.get('q')||'').trim().slice(0,120);
@@ -65,4 +78,7 @@ export function securityDate(value:string|null|undefined){
   if(!value||!Number.isFinite(Date.parse(value)))return '未知';
   return new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));
 }
-export function sourceStale(source:SourceState){return !source.last_success||Date.now()-Date.parse(source.last_success)>3*3600_000;}
+export function sourceStale(source: Pick<SourceState, 'last_success'> | undefined, now = Date.now()) {
+  const age = now - Date.parse(source?.last_success ?? '');
+  return !Number.isFinite(age) || age > maxSyncAge || age < -clockTolerance;
+}

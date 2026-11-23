@@ -221,6 +221,19 @@ def materialize(db):
             db.execute('INSERT INTO security_search VALUES(?,?)',(key,' '.join(aliases+packages+ecosystems+[body['title'],summary])))
     return len(groups)
 
+def sync_source(db, source, fetch_records):
+    state(db, source, last_attempt=now())
+    try:
+        cursor = fetch_records()
+        published = materialize(db)
+        count = db.execute('SELECT count(*) FROM records WHERE source=?', (source,)).fetchone()[0]
+        state(db, source, last_success=now(), cursor=cursor, error=None, count=count)
+        return count, published
+    except Exception as error:
+        db.rollback()
+        state(db, source, error=type(error).__name__)
+        raise
+
 def main():
     import fcntl  # Linux advisory lock; normalization tests also run on Windows.
     parser=argparse.ArgumentParser(); parser.add_argument('--data',required=True); parser.add_argument('--work',required=True)
@@ -236,18 +249,13 @@ def main():
         if args.source in ('all','kev'): tasks.append(('CISA KEV',lambda:kev(db)))
         if args.source in ('all','osv'): tasks.extend(('OSV / '+eco,lambda eco=eco:osv(db,eco)) for eco in ECOSYSTEMS)
         errors=[]
+        count=db.execute('SELECT count(*) FROM entries').fetchone()[0]
         for source,fn in tasks:
-            state(db,source,last_attempt=now())
             try:
-                cursor=fn()
-                count=db.execute('SELECT count(*) FROM records WHERE source=?',(source,)).fetchone()[0]
-                state(db,source,last_success=now(),cursor=cursor,error=None,count=count)
-                print(json.dumps({'source':source,'records':count,'ok':True}),flush=True)
+                source_count,count=sync_source(db,source,fn)
+                print(json.dumps({'source':source,'records':source_count,'ok':True}),flush=True)
             except Exception as error:
-                db.rollback(); state(db,source,error=type(error).__name__)
                 errors.append(source); print(json.dumps({'source':source,'ok':False,'error':type(error).__name__}),flush=True)
-            # Publish each successful source immediately, even during a long first import.
-            count=materialize(db)
         assert db.execute('pragma quick_check').fetchone()[0]=='ok'
         print(json.dumps({'entries':count,'failedSources':errors,'finished':now()}),flush=True)
         db.close()

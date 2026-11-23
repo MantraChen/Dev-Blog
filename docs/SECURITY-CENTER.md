@@ -52,6 +52,20 @@ credential file or Docker socket is mounted in the sync container.
 - Aliases are grouped transitively. Source-specific descriptions, severity assessments and affected-version events are kept separately. Conflicting ratings are disclosed; no CVSS score is invented or recalculated.
 - Chinese summaries use deterministic factual templates. Titles and descriptions retain source language. No AI translation is configured or billed.
 
+### Synchronization health
+
+`GET /api/security/status` returns HTTP 200 with `{"status":"ok"}` when the
+published index is available and all seven feed jobs have a valid successful
+publication within the last three hours. It returns HTTP 503 with `stale` if
+a feed has no recent success, or `unavailable` if the index cannot be read or
+is empty. The response contains only the aggregate status and disables caching.
+The three-hour window tolerates occasional upstream fetch errors. A failed
+publication keeps its previous success timestamp and cursor for a retry.
+
+After deploying both the site and the updated hourly task, add a Kuma HTTP
+monitor for `/api/security/status` that expects HTTP 200. Keep the general site
+health check so a feed delay can be handled independently of an outage.
+
 ## Verification
 
 `python3 -m unittest discover -s tests -p test_security_sync.py -v` checks alias merging, source withdrawals, idempotence, cursor safety and unsafe URLs. `node tests/security-http.mjs` checks live pages, search and filters, unknown advisory 404, HTML attribute escaping, RSS, response page and homepage. Set `SECURITY_TEST_ORIGIN` to the candidate's origin. Run `npm run check` and `npm run build` before container publication.

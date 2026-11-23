@@ -34,6 +34,19 @@ class SecuritySyncTest(unittest.TestCase):
             raise OSError('temporary outage')
         with patch.object(sync,'fetch',fetch),self.assertRaises(OSError):sync.osv(self.db,'npm')
         self.assertEqual(self.db.execute('SELECT cursor FROM states').fetchone()[0],'2026-01-01T00:00:00Z')
+    def test_publication_failure_keeps_success_and_cursor_until_retry(self):
+        self.put('GitHub',self.sample())
+        sync.materialize(self.db)
+        sync.state(self.db,'GitHub',last_success='2026-01-01T00:00:00Z',cursor='old')
+        original=self.entry()
+        with patch.object(sync,'materialize',side_effect=sqlite3.OperationalError),self.assertRaises(sqlite3.OperationalError):
+            sync.sync_source(self.db,'GitHub',lambda:'next')
+        fields='SELECT last_success,cursor,error FROM states WHERE source=?'
+        self.assertEqual(self.db.execute(fields,('GitHub',)).fetchone(),('2026-01-01T00:00:00Z','old','OperationalError'))
+        self.assertEqual(self.entry(),original)
+        with patch.object(sync,'now',return_value='2026-01-01T01:00:00Z'):
+            self.assertEqual(sync.sync_source(self.db,'GitHub',lambda:'next'),(1,1))
+        self.assertEqual(self.db.execute(fields,('GitHub',)).fetchone(),('2026-01-01T01:00:00Z','next',None))
     def test_unsafe_reference_is_never_published_as_link(self):
         r=self.sample(references=[{'url':'javascript:alert(1)'},{'url':'https://example.com/patch'},{'url':'http://127.0.0.1'}])
         self.assertEqual(sync.normalized('GitHub',r)['references'],['https://example.com/patch'])
