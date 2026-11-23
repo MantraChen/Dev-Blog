@@ -3,6 +3,8 @@ import { withBase, contentUrl } from "@/lib/site-path";
 import BaseLayout from "@/components/layout/BaseLayout.astro"
 import { getLatestStatuses, getProjectList, getSkillList, getPublishedPosts } from "@/db/queries"
 import { estimateReadingTime } from "@/lib/utils"
+import { securityList } from "@/lib/security"
+import AdvisoryCard from "@/components/security/AdvisoryCard.astro"
 
 const statuses = await getLatestStatuses(1)
 const projects = await getProjectList()
@@ -11,6 +13,7 @@ const recentPosts = await getPublishedPosts(3)
 
 const topProjects = projects.slice(0, 3)
 const topSkills = skills.slice(0, 12)
+const securityHighlights = securityList(new URLSearchParams('severity=critical'), 3).items
 ---
 
 <BaseLayout title="Howie Sun | Tech Blog">
@@ -22,9 +25,8 @@ const topSkills = skills.slice(0, 12)
           Hi, I'm Howie Sun.
         </h1>
         <p class="max-w-2xl leading-normal text-muted-foreground sm:text-xl sm:leading-8">
-          CTO & Systems Developer.
-          Writing C++, Java, Python, and Rust to build systems that are fast and unbreakable.
-          Specializing in extreme-performance algorithms and kernel-space security.
+          <strong>Independent Researcher &amp; Systems Developer.</strong>
+          Building fast, resilient systems with C++, Rust, Python, and Java—focused on high-performance algorithms, concurrency, and kernel security.
         </p>
       </div>
 
@@ -62,6 +64,10 @@ const topSkills = skills.slice(0, 12)
     </div>
   </section>
 
+  <section class="my-8 space-y-4" aria-labelledby="security-highlights">
+    <div class="flex items-center justify-between gap-4"><h2 id="security-highlights" class="text-2xl font-semibold">Security Watch</h2><a class="text-sm text-muted-foreground hover:underline" href={withBase('/security')}>安全中心 →</a></div>
+    {securityHighlights.length?<div class="grid gap-4 lg:grid-cols-3">{securityHighlights.map(item=><AdvisoryCard item={item}/>)}</div>:<p class="text-sm text-muted-foreground">公开漏洞情报与安全响应公告，<a class="underline" href={withBase('/security')}>前往安全中心</a>。</p>}
+  </section>
   <div class="grid gap-8 md:gap-12 md:grid-cols-2 mt-8">
     <section>
       <div class="flex items-center justify-between mb-6">

@@ -1,0 +1,20 @@
+---
+import { withBase } from '@/lib/site-path';
+import { severityLabels, securityDate, type Advisory } from '@/lib/security';
+interface Props { item: Advisory }
+const {item}=Astro.props;
+---
+<article class="rounded-xl border bg-card p-5 space-y-3 transition-colors hover:border-foreground/40">
+  <div class="flex flex-wrap items-center gap-2 text-xs">
+    <span class:list={['rounded border px-2 py-1',item.severity==='critical'?'border-red-500/50 text-red-500':item.severity==='high'?'border-orange-500/50 text-orange-500':'text-muted-foreground']}>{severityLabels[item.severity]||'未评级'}</span>
+    {item.exploited&&<span class="rounded border border-red-500/50 px-2 py-1 text-red-500">KEV · 已知被利用</span>}
+    {item.withdrawn&&<span class="rounded border px-2 py-1">已撤回</span>}
+    {item.ecosystems.slice(0,4).map(eco=><span class="text-muted-foreground">{eco}</span>)}
+  </div>
+  <a href={withBase('/security/advisories/'+encodeURIComponent(item.id))} class="block space-y-2">
+    <p class="font-mono text-xs text-muted-foreground">{item.id}</p>
+    <h3 class="text-lg font-semibold leading-snug break-words">{item.title}</h3>
+  </a>
+  <p class="text-sm leading-6 text-muted-foreground break-words">{item.summary}</p>
+  <div class="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{[...new Set(item.records.map(r=>r.source))].join(' · ')}</span><time>更新 {securityDate(item.modified)}</time></div>
+</article>

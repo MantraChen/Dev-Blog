@@ -29,6 +29,8 @@ export const GET: APIRoute = async ({ site }) => {
   const staticPages = [
     { url: "/", priority: "1.0" },
     { url: "/blog", priority: "0.9" },
+    { url: "/security", priority: "0.8" },
+    { url: "/security/response", priority: "0.6" },
     { url: "/projects", priority: "0.7" },
     { url: "/skills", priority: "0.6" },
     { url: "/timeline", priority: "0.6" },
