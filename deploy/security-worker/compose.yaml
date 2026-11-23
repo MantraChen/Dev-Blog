@@ -1,0 +1,31 @@
+name: howielog-security-worker
+
+services:
+  security-sync:
+    image: python:3.12.16-slim-trixie@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+    profiles: [scheduled]
+    user: "${SECURITY_SYNC_UID:?Set the existing non-root owner UID}:${SECURITY_SYNC_GID:?Set the existing owner GID}"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    environment:
+      PYTHONUNBUFFERED: "1"
+    entrypoint: ["python3", "/app/security-sync.py", "--data", "/data", "--work", "/work"]
+    volumes:
+      - type: bind
+        source: ../../scripts/security-sync.py
+        target: /app/security-sync.py
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SECURITY_SYNC_DATA_DIR:?Set the existing security database directory}
+        target: /data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SECURITY_SYNC_WORK_DIR:?Set the existing sync state directory}
+        target: /work
+        bind:
+          create_host_path: false
