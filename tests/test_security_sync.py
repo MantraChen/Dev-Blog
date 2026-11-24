@@ -1,4 +1,4 @@
-import importlib.util, json, sqlite3, tempfile, unittest
+import importlib.util, io, json, sqlite3, tempfile, unittest, urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
@@ -19,6 +19,40 @@ class SecuritySyncTest(unittest.TestCase):
         self.assertEqual(sync.materialize(self.db),1)
         entry=self.entry();self.assertTrue(entry['exploited']);self.assertEqual(entry['id'],'CVE-2026-12345')
         self.assertEqual(len(entry['records']),3);self.assertIn({'fixed':'2.0.0'},entry['affected'][0]['ranges'][0]['events'])
+    def test_github_fallback_discards_partial_delta(self):
+        first = 'GHSA-2345-2345-2346'
+        second = 'GHSA-2345-2345-2347'
+        started = sync.now()
+        sync.state(self.db, 'GitHub', cursor=json.dumps({'snapshot': started, 'index': started}))
+        self.db.commit()
+        index = io.BytesIO(f'{started},npm/{first}\n{started},npm/{second}\n'.encode())
+
+        def fetch(url, *args):
+            if url.startswith(sync.BUCKET):
+                return json.dumps({'published': started, 'database_specific': {'github_reviewed': True}}).encode()
+            if first in url:
+                return json.dumps(self.sample(first)).encode()
+            raise urllib.error.URLError('fixture connection reset')
+
+        def snapshot(db, _started):
+            self.assertEqual(db.execute('SELECT id FROM records').fetchall(), [])
+            return 'official snapshot'
+
+        with patch.object(sync.urllib.request, 'urlopen', return_value=index), \
+             patch.object(sync, 'fetch', side_effect=fetch), \
+             patch.object(sync, 'github_snapshot', side_effect=snapshot) as fallback, \
+             patch.object(sync.sys, 'stderr', io.StringIO()):
+            self.assertEqual(sync.github(self.db, Path('.')), 'official snapshot')
+        fallback.assert_called_once()
+
+    def test_kev_uses_official_mirror_when_canonical_fetch_fails(self):
+        records = [{'cveID': f'CVE-2026-{10000+i}'} for i in range(100)]
+        payload = json.dumps({'catalogVersion': 'fixture', 'count': 100, 'vulnerabilities': records}).encode()
+        with patch.object(sync, 'fetch', side_effect=[urllib.error.URLError('fixture outage'), payload]) as fetch:
+            self.assertEqual(sync.kev(self.db), 'fixture')
+        self.assertEqual([call.args[0] for call in fetch.call_args_list], [sync.KEV_FEED, sync.KEV_MIRROR])
+        self.assertEqual(self.db.execute("SELECT count(*) FROM records WHERE source='CISA KEV'").fetchone()[0],100)
+
     def test_source_withdrawal_does_not_hide_other_active_source(self):
         self.put('GitHub',self.sample(withdrawn='2026-02-02T00:00:00Z'));self.put('OSV / npm',self.sample('OSV-2026-123'))
         sync.materialize(self.db);self.assertFalse(self.entry()['withdrawn'])

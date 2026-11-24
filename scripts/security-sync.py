@@ -7,6 +7,8 @@ import re, sqlite3, subprocess, sys, time, urllib.error, urllib.parse, urllib.re
 ECOSYSTEMS = ('npm', 'PyPI', 'Maven', 'crates.io', 'Go')
 BUCKET = 'https://storage.googleapis.com/osv-vulnerabilities/'
 UA = 'HowieLog-Security/1.0 (+https://howielog.com/security)'
+KEV_FEED = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'
+KEV_MIRROR = 'https://raw.githubusercontent.com/cisagov/kev-data/develop/known_exploited_vulnerabilities.json'
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS records(source TEXT,id TEXT,body TEXT,hash TEXT,PRIMARY KEY(source,id));
 CREATE TABLE IF NOT EXISTS states(source TEXT PRIMARY KEY,last_attempt TEXT,last_success TEXT,cursor TEXT,error TEXT,count INTEGER DEFAULT 0);
@@ -22,7 +24,7 @@ def now():
 
 def fetch(url, limit=16*1024*1024):
     # Only fixed, official source endpoints are requested. Redirects remain HTTPS.
-    if not url.startswith(('https://storage.googleapis.com/osv-vulnerabilities/', 'https://raw.githubusercontent.com/cisagov/kev-data/', 'https://raw.githubusercontent.com/github/advisory-database/main/', 'https://codeload.github.com/github/advisory-database/')):
+    if url != KEV_FEED and not url.startswith(('https://storage.googleapis.com/osv-vulnerabilities/', 'https://raw.githubusercontent.com/cisagov/kev-data/', 'https://raw.githubusercontent.com/github/advisory-database/main/', 'https://codeload.github.com/github/advisory-database/')):
         raise ValueError('unapproved feed URL')
     for attempt in range(3):
         try:
@@ -56,26 +58,38 @@ def github(db,work):
     started=now()
     snapshot=cursor.get('snapshot')
     if not snapshot or dt.datetime.now(dt.timezone.utc)-dt.datetime.fromisoformat(snapshot.replace('Z','+00:00'))>dt.timedelta(days=7):
-        archive=fetch('https://codeload.github.com/github/advisory-database/tar.gz/refs/heads/main',256*1024*1024)
-        records=[]
-        with tarfile.open(fileobj=io.BytesIO(archive),mode='r|gz') as tar:
-            for member in tar:
-                if '/advisories/github-reviewed/' in member.name and member.name.endswith('.json') and member.isfile():
-                    if member.size>8*1024*1024:raise ValueError('oversized GitHub advisory')
-                    records.append(json.load(tar.extractfile(member)))
-        if len(records)<1000: raise ValueError('GitHub snapshot incomplete')
-        previous=db.execute("SELECT count(*) FROM records WHERE source='GitHub'").fetchone()[0]
-        if previous and len(records)<previous*0.9:raise ValueError('unexpected GitHub snapshot shrink')
-        db.execute('CREATE TEMP TABLE IF NOT EXISTS gh_seen(id TEXT PRIMARY KEY)')
-        db.execute('DELETE FROM gh_seen')
-        for record in records:
-            put(db,'GitHub',record)
-            db.execute('INSERT INTO gh_seen VALUES(?)',(record['id'],))
-        # Deleted upstream records remain as withdrawn notices rather than disappearing.
-        for rid,body in db.execute("SELECT id,body FROM records WHERE source='GitHub' AND id NOT IN (SELECT id FROM gh_seen)").fetchall():
-            record=json.loads(body); record['withdrawn']=record.get('withdrawn') or now()
-            put(db,'GitHub',record)
-        return json.dumps({'snapshot':started,'index':started})
+        return github_snapshot(db, started)
+    try:
+        return github_delta(db, cursor, started)
+    except OSError:
+        print('GitHub delta unavailable. Refreshing from its official snapshot.', file=sys.stderr, flush=True)
+        return github_snapshot(db, started)
+
+
+def github_snapshot(db, started):
+    archive=fetch('https://codeload.github.com/github/advisory-database/tar.gz/refs/heads/main',256*1024*1024)
+    records=[]
+    with tarfile.open(fileobj=io.BytesIO(archive),mode='r|gz') as tar:
+        for member in tar:
+            if '/advisories/github-reviewed/' in member.name and member.name.endswith('.json') and member.isfile():
+                if member.size>8*1024*1024:raise ValueError('oversized GitHub advisory')
+                records.append(json.load(tar.extractfile(member)))
+    if len(records)<1000: raise ValueError('GitHub snapshot incomplete')
+    previous=db.execute("SELECT count(*) FROM records WHERE source='GitHub'").fetchone()[0]
+    if previous and len(records)<previous*0.9:raise ValueError('unexpected GitHub snapshot shrink')
+    db.execute('CREATE TEMP TABLE IF NOT EXISTS gh_seen(id TEXT PRIMARY KEY)')
+    db.execute('DELETE FROM gh_seen')
+    for record in records:
+        put(db,'GitHub',record)
+        db.execute('INSERT INTO gh_seen VALUES(?)',(record['id'],))
+    # Deleted upstream records remain as withdrawn notices rather than disappearing.
+    for rid,body in db.execute("SELECT id,body FROM records WHERE source='GitHub' AND id NOT IN (SELECT id FROM gh_seen)").fetchall():
+        record=json.loads(body); record['withdrawn']=record.get('withdrawn') or now()
+        put(db,'GitHub',record)
+    return json.dumps({'snapshot':started,'index':started})
+
+
+def github_delta(db, cursor, started):
     # OSV's officially documented newest-first index discovers GHSA changes without
     # a GitHub API token. The record itself is fetched from GitHub's official repo.
     boundary=dt.datetime.fromisoformat(cursor['index'].replace('Z','+00:00'))-dt.timedelta(hours=24)
@@ -97,12 +111,19 @@ def github(db,work):
         url=f'https://raw.githubusercontent.com/github/advisory-database/main/advisories/github-reviewed/{published.year}/{published.month:02d}/{rid}/{rid}.json'
         return json.loads(fetch(url))
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        for record in pool.map(get,pending.items()):
-            if record:put(db,'GitHub',record)
-    return json.dumps({'snapshot':snapshot,'index':started})
+        records = list(pool.map(get, pending.items()))
+    # A failed delta can be replaced by a complete official snapshot.
+    for record in records:
+        if record:
+            put(db, 'GitHub', record)
+    return json.dumps({'snapshot':cursor['snapshot'],'index':started})
 
 def kev(db):
-    data=json.loads(fetch('https://raw.githubusercontent.com/cisagov/kev-data/develop/known_exploited_vulnerabilities.json'))
+    try:
+        payload = fetch(KEV_FEED)
+    except OSError:
+        payload = fetch(KEV_MIRROR)
+    data = json.loads(payload)
     records=data.get('vulnerabilities',[])
     if data.get('count')!=len(records) or len(records)<100: raise ValueError('KEV snapshot incomplete')
     old=db.execute("SELECT count(*) FROM records WHERE source='CISA KEV'").fetchone()[0]
