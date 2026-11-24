@@ -29,7 +29,9 @@ class SecuritySyncTest(unittest.TestCase):
 
         def fetch(url, *args):
             if url.startswith(sync.BUCKET):
-                return json.dumps({'published': started, 'database_specific': {'github_reviewed': True}}).encode()
+                if second in url:
+                    raise urllib.error.URLError('fixture mirror outage')
+                return json.dumps({'id': first, 'published': started, 'database_specific': {'github_reviewed': True}}).encode()
             if first in url:
                 return json.dumps(self.sample(first)).encode()
             raise urllib.error.URLError('fixture connection reset')
@@ -44,6 +46,24 @@ class SecuritySyncTest(unittest.TestCase):
              patch.object(sync.sys, 'stderr', io.StringIO()):
             self.assertEqual(sync.github(self.db, Path('.')), 'official snapshot')
         fallback.assert_called_once()
+
+    def test_github_uses_matching_reviewed_osv_record_on_raw_outage(self):
+        started = sync.now()
+        reviewed = self.sample()
+        reviewed['database_specific']['github_reviewed'] = True
+        index = io.BytesIO(f"{started},npm/{reviewed['id']}\n".encode())
+
+        def fetch(url, *args):
+            if url.startswith(sync.BUCKET):
+                return json.dumps(reviewed).encode()
+            raise urllib.error.URLError('fixture raw outage')
+
+        with patch.object(sync.urllib.request, 'urlopen', return_value=index), \
+             patch.object(sync, 'fetch', side_effect=fetch):
+            cursor = sync.github_delta(self.db, {'snapshot': started, 'index': started}, started)
+        body, = self.db.execute("SELECT body FROM records WHERE source='GitHub'").fetchone()
+        self.assertEqual(json.loads(body), reviewed)
+        self.assertEqual(json.loads(cursor)['index'], started)
 
     def test_kev_uses_official_mirror_when_canonical_fetch_fails(self):
         records = [{'cveID': f'CVE-2026-{10000+i}'} for i in range(100)]

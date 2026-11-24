@@ -106,10 +106,19 @@ def github_delta(db, cursor, started):
     def get(pair):
         rid,eco=pair
         enriched=json.loads(fetch(BUCKET+urllib.parse.quote(eco,safe='')+'/'+rid+'.json'))
-        if not (enriched.get('database_specific') or {}).get('github_reviewed'):return None
+        if enriched.get('id') != rid:
+            raise ValueError('OSV advisory does not match the requested ID')
+        if (enriched.get('database_specific') or {}).get('github_reviewed') is not True:
+            return None
         published=dt.datetime.fromisoformat(enriched['published'].replace('Z','+00:00'))
         url=f'https://raw.githubusercontent.com/github/advisory-database/main/advisories/github-reviewed/{published.year}/{published.month:02d}/{rid}/{rid}.json'
-        return json.loads(fetch(url))
+        try:
+            return json.loads(fetch(url))
+        except OSError:
+            # OSV already imported this reviewed GitHub advisory. Use that
+            # record when direct transport fails to avoid a full archive for
+            # a single missing download.
+            return enriched
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         records = list(pool.map(get, pending.items()))
     # A failed delta can be replaced by a complete official snapshot.
