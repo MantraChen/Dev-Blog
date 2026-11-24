@@ -20,9 +20,6 @@ services:
         source: ../../scripts/security-sync.py
         target: /app/security-sync.py
         read_only: true
-    # SQLite may spill temporary data while refreshing large indexes.
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777
         bind:
           create_host_path: false
       - type: bind
