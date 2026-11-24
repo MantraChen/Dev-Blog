@@ -27,7 +27,7 @@ class SecuritySyncTest(unittest.TestCase):
         self.db.commit()
         index = io.BytesIO(f'{started},npm/{first}\n{started},npm/{second}\n'.encode())
 
-        def fetch(url, *args):
+        def fetch(url, *args, **kwargs):
             if url.startswith(sync.BUCKET):
                 if second in url:
                     raise urllib.error.URLError('fixture mirror outage')
@@ -53,9 +53,10 @@ class SecuritySyncTest(unittest.TestCase):
         reviewed['database_specific']['github_reviewed'] = True
         index = io.BytesIO(f"{started},npm/{reviewed['id']}\n".encode())
 
-        def fetch(url, *args):
+        def fetch(url, *args, **kwargs):
             if url.startswith(sync.BUCKET):
                 return json.dumps(reviewed).encode()
+            self.assertEqual(kwargs, {'attempts': 1, 'timeout': 8})
             raise urllib.error.URLError('fixture raw outage')
 
         with patch.object(sync.urllib.request, 'urlopen', return_value=index), \

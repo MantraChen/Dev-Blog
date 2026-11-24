@@ -22,19 +22,19 @@ CREATE VIRTUAL TABLE IF NOT EXISTS security_search USING fts5(id UNINDEXED,text,
 def now():
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z')
 
-def fetch(url, limit=16*1024*1024):
+def fetch(url, limit=16*1024*1024, *, attempts=3, timeout=45):
     # Only fixed, official source endpoints are requested. Redirects remain HTTPS.
     if url != KEV_FEED and not url.startswith(('https://storage.googleapis.com/osv-vulnerabilities/', 'https://raw.githubusercontent.com/cisagov/kev-data/', 'https://raw.githubusercontent.com/github/advisory-database/main/', 'https://codeload.github.com/github/advisory-database/')):
         raise ValueError('unapproved feed URL')
-    for attempt in range(3):
+    for attempt in range(attempts):
         try:
-            with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':UA}),timeout=45) as r:
+            with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':UA}), timeout=timeout) as r:
                 if not r.geturl().startswith('https://'): raise ValueError('non-HTTPS redirect')
                 data=r.read(limit+1)
                 if len(data)>limit: raise ValueError('feed size limit exceeded')
                 return data
         except (OSError,ValueError):
-            if attempt==2: raise
+            if attempt == attempts - 1: raise
             time.sleep(2**attempt)
 
 def put(db,source,record):
@@ -113,7 +113,7 @@ def github_delta(db, cursor, started):
         published=dt.datetime.fromisoformat(enriched['published'].replace('Z','+00:00'))
         url=f'https://raw.githubusercontent.com/github/advisory-database/main/advisories/github-reviewed/{published.year}/{published.month:02d}/{rid}/{rid}.json'
         try:
-            return json.loads(fetch(url))
+            return json.loads(fetch(url, attempts=1, timeout=8))
         except OSError:
             # OSV already imported this reviewed GitHub advisory. Use that
             # record when direct transport fails to avoid a full archive for
