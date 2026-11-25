@@ -7,6 +7,8 @@ import re, sqlite3, subprocess, sys, time, urllib.error, urllib.parse, urllib.re
 ECOSYSTEMS = ('npm', 'PyPI', 'Maven', 'crates.io', 'Go')
 BUCKET = 'https://storage.googleapis.com/osv-vulnerabilities/'
 UA = 'HowieLog-Security/1.0 (+https://howielog.com/security)'
+KEV_FEED = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'
+KEV_MIRROR = 'https://raw.githubusercontent.com/cisagov/kev-data/develop/known_exploited_vulnerabilities.json'
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS records(source TEXT,id TEXT,body TEXT,hash TEXT,PRIMARY KEY(source,id));
 CREATE TABLE IF NOT EXISTS states(source TEXT PRIMARY KEY,last_attempt TEXT,last_success TEXT,cursor TEXT,error TEXT,count INTEGER DEFAULT 0);
@@ -20,19 +22,19 @@ CREATE VIRTUAL TABLE IF NOT EXISTS security_search USING fts5(id UNINDEXED,text,
 def now():
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z')
 
-def fetch(url, limit=16*1024*1024):
+def fetch(url, limit=16*1024*1024, *, attempts=3, timeout=45):
     # Only fixed, official source endpoints are requested. Redirects remain HTTPS.
-    if not url.startswith(('https://storage.googleapis.com/osv-vulnerabilities/', 'https://raw.githubusercontent.com/cisagov/kev-data/', 'https://raw.githubusercontent.com/github/advisory-database/main/', 'https://codeload.github.com/github/advisory-database/')):
+    if url != KEV_FEED and not url.startswith(('https://storage.googleapis.com/osv-vulnerabilities/', 'https://raw.githubusercontent.com/cisagov/kev-data/', 'https://raw.githubusercontent.com/github/advisory-database/main/', 'https://codeload.github.com/github/advisory-database/')):
         raise ValueError('unapproved feed URL')
-    for attempt in range(3):
+    for attempt in range(attempts):
         try:
-            with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':UA}),timeout=45) as r:
+            with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':UA}), timeout=timeout) as r:
                 if not r.geturl().startswith('https://'): raise ValueError('non-HTTPS redirect')
                 data=r.read(limit+1)
                 if len(data)>limit: raise ValueError('feed size limit exceeded')
                 return data
         except (OSError,ValueError):
-            if attempt==2: raise
+            if attempt == attempts - 1: raise
             time.sleep(2**attempt)
 
 def put(db,source,record):
@@ -56,27 +58,38 @@ def github(db,work):
     started=now()
     snapshot=cursor.get('snapshot')
     if not snapshot or dt.datetime.now(dt.timezone.utc)-dt.datetime.fromisoformat(snapshot.replace('Z','+00:00'))>dt.timedelta(days=7):
-        archive=fetch('https://codeload.github.com/github/advisory-database/tar.gz/refs/heads/main',256*1024*1024)
-        records=[]
-        with tarfile.open(fileobj=io.BytesIO(archive),mode='r|gz') as tar:
-            for member in tar:
-                if '/advisories/github-reviewed/' in member.name and member.name.endswith('.json') and member.isfile():
-                    if member.size>8*1024*1024:raise ValueError('oversized GitHub advisory')
-                    records.append(json.load(tar.extractfile(member)))
-        if len(records)<1000: raise ValueError('GitHub snapshot incomplete')
-        previous=db.execute("SELECT count(*) FROM records WHERE source='GitHub'").fetchone()[0]
-        if previous and len(records)<previous*0.9:raise ValueError('unexpected GitHub snapshot shrink')
-        with db:
-            db.execute('CREATE TEMP TABLE IF NOT EXISTS gh_seen(id TEXT PRIMARY KEY)')
-            db.execute('DELETE FROM gh_seen')
-            for record in records:
-                put(db,'GitHub',record)
-                db.execute('INSERT INTO gh_seen VALUES(?)',(record['id'],))
-            # Deleted upstream records remain as withdrawn notices rather than disappearing.
-            for rid,body in db.execute("SELECT id,body FROM records WHERE source='GitHub' AND id NOT IN (SELECT id FROM gh_seen)").fetchall():
-                record=json.loads(body); record['withdrawn']=record.get('withdrawn') or now()
-                put(db,'GitHub',record)
-        return json.dumps({'snapshot':started,'index':started})
+        return github_snapshot(db, started)
+    try:
+        return github_delta(db, cursor, started)
+    except OSError:
+        print('GitHub delta unavailable. Refreshing from its official snapshot.', file=sys.stderr, flush=True)
+        return github_snapshot(db, started)
+
+
+def github_snapshot(db, started):
+    archive=fetch('https://codeload.github.com/github/advisory-database/tar.gz/refs/heads/main',256*1024*1024)
+    records=[]
+    with tarfile.open(fileobj=io.BytesIO(archive),mode='r|gz') as tar:
+        for member in tar:
+            if '/advisories/github-reviewed/' in member.name and member.name.endswith('.json') and member.isfile():
+                if member.size>8*1024*1024:raise ValueError('oversized GitHub advisory')
+                records.append(json.load(tar.extractfile(member)))
+    if len(records)<1000: raise ValueError('GitHub snapshot incomplete')
+    previous=db.execute("SELECT count(*) FROM records WHERE source='GitHub'").fetchone()[0]
+    if previous and len(records)<previous*0.9:raise ValueError('unexpected GitHub snapshot shrink')
+    db.execute('CREATE TEMP TABLE IF NOT EXISTS gh_seen(id TEXT PRIMARY KEY)')
+    db.execute('DELETE FROM gh_seen')
+    for record in records:
+        put(db,'GitHub',record)
+        db.execute('INSERT INTO gh_seen VALUES(?)',(record['id'],))
+    # Deleted upstream records remain as withdrawn notices rather than disappearing.
+    for rid,body in db.execute("SELECT id,body FROM records WHERE source='GitHub' AND id NOT IN (SELECT id FROM gh_seen)").fetchall():
+        record=json.loads(body); record['withdrawn']=record.get('withdrawn') or now()
+        put(db,'GitHub',record)
+    return json.dumps({'snapshot':started,'index':started})
+
+
+def github_delta(db, cursor, started):
     # OSV's officially documented newest-first index discovers GHSA changes without
     # a GitHub API token. The record itself is fetched from GitHub's official repo.
     boundary=dt.datetime.fromisoformat(cursor['index'].replace('Z','+00:00'))-dt.timedelta(hours=24)
@@ -93,24 +106,39 @@ def github(db,work):
     def get(pair):
         rid,eco=pair
         enriched=json.loads(fetch(BUCKET+urllib.parse.quote(eco,safe='')+'/'+rid+'.json'))
-        if not (enriched.get('database_specific') or {}).get('github_reviewed'):return None
+        if enriched.get('id') != rid:
+            raise ValueError('OSV advisory does not match the requested ID')
+        if (enriched.get('database_specific') or {}).get('github_reviewed') is not True:
+            return None
         published=dt.datetime.fromisoformat(enriched['published'].replace('Z','+00:00'))
         url=f'https://raw.githubusercontent.com/github/advisory-database/main/advisories/github-reviewed/{published.year}/{published.month:02d}/{rid}/{rid}.json'
-        return json.loads(fetch(url))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool,db:
-        for record in pool.map(get,pending.items()):
-            if record:put(db,'GitHub',record)
-    return json.dumps({'snapshot':snapshot,'index':started})
+        try:
+            return json.loads(fetch(url, attempts=1, timeout=8))
+        except OSError:
+            # OSV already imported this reviewed GitHub advisory. Use that
+            # record when direct transport fails to avoid a full archive for
+            # a single missing download.
+            return enriched
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        records = list(pool.map(get, pending.items()))
+    # A failed delta can be replaced by a complete official snapshot.
+    for record in records:
+        if record:
+            put(db, 'GitHub', record)
+    return json.dumps({'snapshot':cursor['snapshot'],'index':started})
 
 def kev(db):
-    data=json.loads(fetch('https://raw.githubusercontent.com/cisagov/kev-data/develop/known_exploited_vulnerabilities.json'))
+    try:
+        payload = fetch(KEV_FEED)
+    except OSError:
+        payload = fetch(KEV_MIRROR)
+    data = json.loads(payload)
     records=data.get('vulnerabilities',[])
     if data.get('count')!=len(records) or len(records)<100: raise ValueError('KEV snapshot incomplete')
     old=db.execute("SELECT count(*) FROM records WHERE source='CISA KEV'").fetchone()[0]
     if old and len(records)<old*0.9: raise ValueError('unexpected KEV catalog shrink')
-    with db:
-        db.execute("DELETE FROM records WHERE source='CISA KEV'")
-        for record in records: put(db,'CISA KEV',record)
+    db.execute("DELETE FROM records WHERE source='CISA KEV'")
+    for record in records: put(db,'CISA KEV',record)
     return data['catalogVersion']
 
 def osv(db,eco):
@@ -132,7 +160,7 @@ def osv(db,eco):
     if not cursor and len(pending)>1000:
         # First run: one bounded archive, not thousands of individual API calls.
         archive=fetch(root+'all.zip',384*1024*1024)
-        with zipfile.ZipFile(io.BytesIO(archive)) as z, db:
+        with zipfile.ZipFile(io.BytesIO(archive)) as z:
             for info in z.infolist():
                 if info.file_size>8*1024*1024: raise ValueError('oversized OSV record')
                 rid=Path(info.filename).stem
@@ -142,7 +170,7 @@ def osv(db,eco):
     else:
         def get(rid): return json.loads(fetch(root+urllib.parse.quote(rid,safe='')+'.json',8*1024*1024))
         # Failed records fail the source, retaining its old cursor for automatic retry.
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool, db:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             for record in pool.map(get,pending): put(db,source,record)
     return high or cursor or now()
 
@@ -183,9 +211,8 @@ def materialize(db):
     # A prior GitHub outage may have bootstrapped GHSA copies through OSV. Once
     # authoritative records are available, drop these copies to prevent stale
     # duplicate versions or withdrawal flags from surviving future delta syncs.
-    with db:
-        db.execute("DELETE FROM records WHERE source LIKE 'OSV / %' AND id IN (SELECT id FROM records WHERE source='GitHub')")
-        db.execute('UPDATE states SET count=(SELECT count(*) FROM records WHERE records.source=states.source)')
+    db.execute("DELETE FROM records WHERE source LIKE 'OSV / %' AND id IN (SELECT id FROM records WHERE source='GitHub')")
+    db.execute('UPDATE states SET count=(SELECT count(*) FROM records WHERE records.source=states.source)')
     rows=[normalized(source,json.loads(body)) for source,body in db.execute('SELECT source,body FROM records ORDER BY source,id')]
     parent={}
     def find(x):
@@ -196,30 +223,45 @@ def materialize(db):
         for alias in r['aliases'][1:]: parent[find(alias)]=find(r['id'])
     groups={}
     for r in rows: groups.setdefault(find(r['id']),[]).append(r)
-    with db:
-        db.execute('DELETE FROM entries'); db.execute('DELETE FROM aliases'); db.execute('DELETE FROM security_search')
-        for records in groups.values():
-            records.sort(key=lambda r:(r['source']!='GitHub',r['source']=='CISA KEV',r['id']))
-            aliases=sorted({a for r in records for a in r['aliases']},key=lambda a:(not a.startswith('CVE-'),not a.startswith('GHSA-'),a))
-            key=aliases[0]; preferred=next((r for r in records if not r['withdrawn'] and not r['exploited']),records[0])
-            # Withdrawals are source-specific: never let a withdrawn GHSA erase an active CVE/OSV notice.
-            withdrawn=all(bool(r['withdrawn']) for r in records)
-            exploited=any(r['exploited'] for r in records)
-            levels=[r['severity'] for r in records if not r['withdrawn'] and r['severity']!='unknown']
-            level=levels[0] if levels else 'unknown'
-            affected=[dict(item,source=r['source'],record=r['id']) for r in records for item in r['affected']]
-            packages=sorted({p['package'] for p in affected}); ecosystems=sorted({p['ecosystem'] for p in affected})
-            dates=[r['published'] for r in records if r['published']]
-            updates=[r['modified'] or ((r['kevAdded'] or '')+'T00:00:00Z' if r['kevAdded'] else '') for r in records]
-            published=min(dates) if dates else ''; modified=max(updates) or published
-            labels={'critical':'严重','high':'高危','medium':'中危','low':'低危','unknown':'未评级'}
-            summary=f"涉及 {', '.join(packages[:3]) or '上游未提供组件'}。来源评级：{labels[level]}；"+('CISA KEV 已确认存在实际利用。' if exploited else '本地 KEV 数据未标记；不代表没有实际利用。')+'影响范围和修复节点请按下列来源记录核对；未提供的信息保持未知。'
-            if withdrawn: summary='该公告已被所有收录来源撤回，请勿依据旧摘要判断风险。'+summary
-            body={'id':key,'aliases':aliases,'title':preferred['title'],'summary':summary,'records':records,'affected':affected,'severity':level,'exploited':exploited,'withdrawn':withdrawn,'published':published,'modified':modified,'ecosystems':ecosystems,'packages':packages}
-            db.execute('INSERT INTO entries VALUES(?,?,?,?,?,?,?,?,?,?,?)',(key,body['title'],summary,json.dumps(ecosystems),json.dumps(packages),level,int(exploited),int(withdrawn),published,modified,json.dumps(body,ensure_ascii=False)))
-            db.executemany('INSERT INTO aliases VALUES(?,?)',[(alias,key) for alias in aliases])
-            db.execute('INSERT INTO security_search VALUES(?,?)',(key,' '.join(aliases+packages+ecosystems+[body['title'],summary])))
+    db.execute('DELETE FROM entries'); db.execute('DELETE FROM aliases'); db.execute('DELETE FROM security_search')
+    for records in groups.values():
+        records.sort(key=lambda r:(r['source']!='GitHub',r['source']=='CISA KEV',r['id']))
+        aliases=sorted({a for r in records for a in r['aliases']},key=lambda a:(not a.startswith('CVE-'),not a.startswith('GHSA-'),a))
+        key=aliases[0]; preferred=next((r for r in records if not r['withdrawn'] and not r['exploited']),records[0])
+        # Withdrawals are source-specific: never let a withdrawn GHSA erase an active CVE/OSV notice.
+        withdrawn=all(bool(r['withdrawn']) for r in records)
+        exploited=any(r['exploited'] for r in records)
+        levels=[r['severity'] for r in records if not r['withdrawn'] and r['severity']!='unknown']
+        level=levels[0] if levels else 'unknown'
+        affected=[dict(item,source=r['source'],record=r['id']) for r in records for item in r['affected']]
+        packages=sorted({p['package'] for p in affected}); ecosystems=sorted({p['ecosystem'] for p in affected})
+        dates=[r['published'] for r in records if r['published']]
+        updates=[r['modified'] or ((r['kevAdded'] or '')+'T00:00:00Z' if r['kevAdded'] else '') for r in records]
+        published=min(dates) if dates else ''; modified=max(updates) or published
+        labels={'critical':'严重','high':'高危','medium':'中危','low':'低危','unknown':'未评级'}
+        summary=f"涉及 {', '.join(packages[:3]) or '上游未提供组件'}。来源评级：{labels[level]}；"+('CISA KEV 已确认存在实际利用。' if exploited else '本地 KEV 数据未标记；不代表没有实际利用。')+'影响范围和修复节点请按下列来源记录核对；未提供的信息保持未知。'
+        if withdrawn: summary='该公告已被所有收录来源撤回，请勿依据旧摘要判断风险。'+summary
+        body={'id':key,'aliases':aliases,'title':preferred['title'],'summary':summary,'records':records,'affected':affected,'severity':level,'exploited':exploited,'withdrawn':withdrawn,'published':published,'modified':modified,'ecosystems':ecosystems,'packages':packages}
+        db.execute('INSERT INTO entries VALUES(?,?,?,?,?,?,?,?,?,?,?)',(key,body['title'],summary,json.dumps(ecosystems),json.dumps(packages),level,int(exploited),int(withdrawn),published,modified,json.dumps(body,ensure_ascii=False)))
+        db.executemany('INSERT INTO aliases VALUES(?,?)',[(alias,key) for alias in aliases])
+        db.execute('INSERT INTO security_search VALUES(?,?)',(key,' '.join(aliases+packages+ecosystems+[body['title'],summary])))
     return len(groups)
+
+def sync_source(db, source, fetch_records):
+    with db:
+        state(db, source, last_attempt=now())
+    try:
+        with db:
+            cursor = fetch_records()
+            published = materialize(db)
+            count = db.execute('SELECT count(*) FROM records WHERE source=?', (source,)).fetchone()[0]
+            state(db, source, last_success=now(), cursor=cursor, error=None, count=count)
+        return count, published
+    except Exception as error:
+        with db:
+            state(db, source, error=type(error).__name__)
+        raise
+
 
 def main():
     import fcntl  # Linux advisory lock; normalization tests also run on Windows.
@@ -236,18 +278,13 @@ def main():
         if args.source in ('all','kev'): tasks.append(('CISA KEV',lambda:kev(db)))
         if args.source in ('all','osv'): tasks.extend(('OSV / '+eco,lambda eco=eco:osv(db,eco)) for eco in ECOSYSTEMS)
         errors=[]
+        count=db.execute('SELECT count(*) FROM entries').fetchone()[0]
         for source,fn in tasks:
-            state(db,source,last_attempt=now())
             try:
-                cursor=fn()
-                count=db.execute('SELECT count(*) FROM records WHERE source=?',(source,)).fetchone()[0]
-                state(db,source,last_success=now(),cursor=cursor,error=None,count=count)
-                print(json.dumps({'source':source,'records':count,'ok':True}),flush=True)
+                source_count,count=sync_source(db,source,fn)
+                print(json.dumps({'source':source,'records':source_count,'ok':True}),flush=True)
             except Exception as error:
-                db.rollback(); state(db,source,error=type(error).__name__)
                 errors.append(source); print(json.dumps({'source':source,'ok':False,'error':type(error).__name__}),flush=True)
-            # Publish each successful source immediately, even during a long first import.
-            count=materialize(db)
         assert db.execute('pragma quick_check').fetchone()[0]=='ok'
         print(json.dumps({'entries':count,'failedSources':errors,'finished':now()}),flush=True)
         db.close()
