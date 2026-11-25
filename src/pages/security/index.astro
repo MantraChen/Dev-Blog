@@ -1,0 +1,34 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import AdvisoryCard from '@/components/security/AdvisoryCard.astro';
+import { securityList,securityStatus,securityDate,sourceStale,severityLabels,ecosystemOptions } from '@/lib/security';
+import { withBase } from '@/lib/site-path';
+const status=securityStatus();
+const result=securityList(Astro.url.searchParams);
+const pageLink=(page:number)=>{const q=new URLSearchParams(Astro.url.searchParams);q.set('page',String(page));return withBase('/security')+'?'+q;};
+const filtered=[...Astro.url.searchParams.keys()].length>0;
+---
+<BaseLayout title="安全中心 | HowieLog" description="公开漏洞情报、修复信息与 Howie Sun 的安全响应公告。" language="zh-CN" noIndex={filtered}>
+  <section class="py-8 sm:py-12 space-y-6">
+    <p class="text-xs font-mono tracking-widest text-muted-foreground">SECURITY / VULNERABILITY INTELLIGENCE</p>
+    <div class="flex flex-wrap justify-between items-end gap-5"><div class="space-y-3"><h1 class="text-4xl sm:text-5xl font-bold tracking-tight">安全中心</h1><p class="text-muted-foreground max-w-2xl leading-7">关注漏洞本身，也关注如何修复。公开来源同步、结构化中文摘要，以及独立发布的安全响应公告。</p></div><a class="rounded-md border px-4 py-2 text-sm" href={withBase('/security/response')}>安全响应与披露 →</a></div>
+    <div class="flex flex-wrap gap-5 text-sm"><span><strong>{status.total.toLocaleString()}</strong> 条合并情报</span><span><strong>{status.exploited.toLocaleString()}</strong> 条 KEV 标记</span><a class="underline underline-offset-4" href={withBase('/security/rss.xml')}>订阅安全 RSS</a></div>
+  </section>
+  <div class="rounded-xl border bg-muted/30 p-4 text-sm leading-6 text-muted-foreground">自动汇总不代表本站发现或复现了这些漏洞。摘要采用事实模板生成；标题与来源描述保留原文。影响范围、修复节点和评级按来源展示，未公布的信息保持未知。KEV 未标记不代表不存在利用。</div>
+  <section class="my-8 space-y-5" aria-labelledby="intel-title">
+    <h2 id="intel-title" class="text-2xl font-semibold">漏洞情报</h2>
+    <form method="get" action={withBase('/security')} class="grid gap-3 rounded-xl border p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <label class="space-y-2 text-sm">搜索编号或组件<input class="w-full rounded border bg-background px-3 py-2" type="search" name="q" value={result.q} placeholder="CVE、GHSA、组件名" maxlength="120"/></label>
+      <label class="space-y-2 text-sm">生态<select name="ecosystem" class="w-full rounded border bg-background px-3 py-2"><option value="">全部生态</option>{ecosystemOptions.map(eco=><option value={eco} selected={result.ecosystem===eco}>{eco}</option>)}</select></label>
+      <label class="space-y-2 text-sm">来源评级<select name="severity" class="w-full rounded border bg-background px-3 py-2"><option value="">全部评级</option>{Object.entries(severityLabels).map(([value,label])=><option value={value} selected={result.severity===value}>{label}</option>)}</select></label>
+      <div class="flex flex-col justify-end gap-2 text-sm"><label class="flex gap-2 items-center"><input type="checkbox" name="exploited" value="1" checked={result.exploited}/>仅 KEV 已知被利用</label><label class="flex gap-2 items-center"><input type="checkbox" name="withdrawn" value="1" checked={result.withdrawn}/>查看全部来源均撤回的公告</label></div>
+      <div class="flex gap-4 items-center sm:col-span-2 lg:col-span-4"><button class="rounded bg-primary text-primary-foreground px-5 py-2 text-sm" type="submit">筛选</button><a class="text-sm underline" href={withBase('/security')}>重置</a><span class="text-xs text-muted-foreground">匹配 {result.total.toLocaleString()} 条 · 时间为北京时间</span></div>
+    </form>
+    {result.items.length?<div class="grid gap-4 md:grid-cols-2">{result.items.map(item=><AdvisoryCard item={item}/>)}</div>:<div class="rounded-xl border border-dashed p-12 text-center text-muted-foreground">{status.total?'没有匹配的公告，请调整筛选条件。':'首次数据同步中。已完成的数据源会陆续出现在这里。'}</div>}
+    <nav aria-label="情报分页" class="flex justify-between items-center text-sm">{result.page>1?<a class="rounded border px-4 py-2" href={pageLink(result.page-1)}>← 上一页</a>:<span/>}<span>第 {result.page} / {Math.max(1,Math.ceil(result.total/24))} 页</span>{result.page*24<result.total?<a class="rounded border px-4 py-2" href={pageLink(result.page+1)}>下一页 →</a>:<span/>}</nav>
+  </section>
+  <section class="border-t pt-7 space-y-4" aria-labelledby="sync-title"><h2 id="sync-title" class="text-xl font-semibold">数据来源与同步状态</h2><p class="text-sm text-muted-foreground leading-6">每小时检查更新；首次导入历史快照，之后按修改时间同步，并定期重建索引校验。覆盖 GitHub 已审核公告、OSV 的 npm / PyPI / Maven / crates.io / Go，以及完整 CISA KEV 目录，不声称覆盖全球所有漏洞。同步失败会保留上一次成功数据。</p>
+    <ul class="grid gap-3 sm:grid-cols-2">{status.sources.map(source=><li class="rounded-lg border p-4 text-sm space-y-2"><div class="flex justify-between gap-2"><strong>{source.source}</strong><span class={source.error||sourceStale(source)?'text-amber-600':'text-muted-foreground'}>{source.error?'同步失败，将自动重试':sourceStale(source)?'待同步 / 数据可能滞后':'同步正常'}</span></div><p class="text-muted-foreground">最近成功：{securityDate(source.last_success)}</p><p class="text-muted-foreground">最近尝试：{securityDate(source.last_attempt)} · {source.count.toLocaleString()} 条来源记录</p></li>)}</ul>
+    <p class="text-xs text-muted-foreground leading-6">来源：<a class="underline" href="https://github.com/github/advisory-database">GitHub Advisory Database（CC BY 4.0，本站作结构化摘要）</a> · <a class="underline" href="https://osv.dev">OSV（各记录遵循上游来源条款）</a> · <a class="underline" href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog">CISA KEV</a>。同一漏洞的多个来源可能给出不同版本范围或评级，详情页保留各自记录。</p>
+  </section>
+</BaseLayout>

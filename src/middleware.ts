@@ -58,7 +58,7 @@ export const onRequest = defineMiddleware(
       const rate =
         limitedPaths.has(path) ||
         path.startsWith("/cards/") ||
-        (path === "/blog" && url.searchParams.has("q"))
+        (["/blog", "/security"].includes(path) && url.searchParams.has("q"))
           ? publicLimits.check(getClientIp(clientAddress))
           : null;
       if (rate && !rate.allowed) {

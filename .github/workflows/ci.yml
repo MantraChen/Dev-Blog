@@ -25,9 +25,13 @@ jobs:
         with:
           node-version: "24.22.1"
           cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - run: python -m unittest discover -s tests -p test_security_sync.py
       - run: npm run test:scale
       - run: npm run build
       - run: npm run test:http

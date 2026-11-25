@@ -1,0 +1,16 @@
+---
+import BaseLayout from '@/components/layout/BaseLayout.astro';
+import { getPublishedPostMetadata } from '@/db/queries';
+import { withBase } from '@/lib/site-path';
+import { securityDate } from '@/lib/security';
+const posts=(await getPublishedPostMetadata()).filter(post=>post.tags.includes('security-response'));
+---
+<BaseLayout title="安全响应与漏洞披露 | HowieLog" description="Howie Sun 的独立安全研究、项目修复公告与负责任披露说明。" language="zh-CN">
+  <a class="text-sm text-muted-foreground hover:underline" href={withBase('/security')}>← 安全中心</a>
+  <section class="py-10 max-w-3xl mx-auto space-y-8">
+    <header class="space-y-4"><p class="font-mono text-xs tracking-widest text-muted-foreground">SECURITY RESPONSE / DISCLOSURE</p><h1 class="text-4xl font-bold tracking-tight">安全响应与漏洞披露</h1><p class="text-muted-foreground leading-7">记录独立安全研究、维护项目的安全修复，以及经确认后发布的披露公告。外部漏洞情报请查看安全中心的自动汇总栏目。</p></header>
+    <section class="rounded-xl border p-6 space-y-4"><h2 class="text-xl font-semibold">报告安全问题</h2><p class="leading-7 text-sm">如果问题涉及我的开源项目，请在对应 GitHub 仓库的 Security 页面使用私密漏洞报告入口（如已启用）。如果未提供私密入口，可先提交不含敏感细节的联系方式请求；不要在公开 Issue 中附带凭证、个人数据或未披露的利用细节。</p><a class="inline-block underline underline-offset-4 text-sm" href="https://github.com/MantraChen?tab=repositories" rel="noopener noreferrer" target="_blank">查找对应项目 →</a><p class="text-sm text-muted-foreground">报告建议包含：受影响项目与版本、问题描述、最小复现条件、影响说明和修复建议。请仅在自己拥有或明确获授权的环境中验证。</p></section>
+    <section class="space-y-4"><h2 class="text-2xl font-semibold">已发布的响应公告</h2>{posts.length?<ul class="space-y-3">{posts.map(post=><li class="rounded-xl border p-5"><a class="font-semibold hover:underline" href={withBase('/blog/'+encodeURIComponent(post.slug))}>{post.title}</a><p class="mt-2 text-xs text-muted-foreground">{securityDate(post.updatedAt||post.publishedAt)}</p></li>)}</ul>:<p class="rounded-xl border border-dashed p-8 text-muted-foreground">暂未发布独立安全响应公告。后续经确认的研究与修复记录将在这里列出。</p>}</section>
+    <section class="border-t pt-6 space-y-3 text-sm leading-7"><h2 class="text-lg font-semibold">披露原则</h2><p>先核实影响和复现条件，与受影响项目维护者协调修复；公开公告区分已确认事实、待确认事项与修复进展。引用的外部漏洞不会标注为本站发现。</p><p class="text-muted-foreground">页面当前不承诺固定响应时限，也不代表任何第三方厂商的官方响应机构。</p></section>
+  </section>
+</BaseLayout>

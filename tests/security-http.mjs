@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+const base=process.env.SECURITY_TEST_ORIGIN||'http://127.0.0.1:14322';
+const get=async path=>{const r=await fetch(base+path);return {r,text:await r.text()};};
+const home=await get('/security');assert.equal(home.r.status,200);assert.match(home.text,/安全中心/);assert.match(home.text,/数据来源与同步状态/);
+const link=home.text.match(/href="([^"]*\/security\/advisories\/[^"?]+)"/);assert.ok(link,'live advisory card exists');
+const detail=await get(link[1]);assert.equal(detail.r.status,200);assert.match(detail.text,/影响范围与修复节点/);assert.match(detail.text,/来源公告/);
+const missing=await get('/security/advisories/NO-SUCH-ADVISORY');assert.equal(missing.r.status,404);
+const empty=await get('/security?q=no-such-package-7824619264');assert.equal(empty.r.status,200);assert.match(empty.text,/没有匹配/);
+const injection=await get('/security?q='+encodeURIComponent('\" OR 1=1 -- <script>alert(1)</script>'));assert.equal(injection.r.status,200);assert.ok(!injection.text.replace(/"[^"]*"/g,'""').includes('<script>alert(1)</script>'));assert.match(injection.text,/value="&quot; OR/);
+const kev=await get('/security?exploited=1');assert.equal(kev.r.status,200);assert.match(kev.text,/已知被利用/);
+const feed=await get('/security/rss.xml');assert.equal(feed.r.status,200);assert.match(feed.r.headers.get('content-type'),/xml/);assert.match(feed.text,/<rss/);assert.match(feed.text,/<item>/);
+const response=await get('/security/response');assert.equal(response.r.status,200);assert.match(response.text,/安全响应与漏洞披露/);
+const root=await get('/');assert.equal(root.r.status,200);assert.match(root.text,/Independent Researcher/);assert.match(root.text,/Security Watch/);
+console.log(JSON.stringify({checks:9,security:200,detail:200,missing:404,search:true,xssEscaped:true,kev:true,rss:true,response:true,homepage:true}));
